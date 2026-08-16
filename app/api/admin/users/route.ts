@@ -4,7 +4,6 @@ import User from '@/models/User';
 import Profile from '@/models/Profile';
 import AdminLog from '@/models/AdminLog';
 import { requireAdminAuth } from '@/lib/auth';
-import { SEED_PROFILES } from '@/utils/seedData';
 
 export async function GET(req: Request) {
   try {
@@ -23,8 +22,8 @@ export async function GET(req: Request) {
             role: u.role,
             status: u.status || 'active',
             isVerified: u.isVerified,
-            name: prof?.firstName,
-            city: prof?.city,
+            name: prof?.name || prof?.firstName || u.email?.split('@')[0] || 'User',
+            city: prof?.city || 'New Delhi',
             createdAt: u.createdAt.toISOString(),
           };
         });
@@ -35,28 +34,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
-      users: [
-        {
-          _id: 'user_admin_mohit',
-          email: 'mohit@gmail.com',
-          role: 'superadmin' as const,
-          status: 'active' as const,
-          isVerified: true,
-          name: 'Mohit',
-          city: 'New Delhi',
-          createdAt: '2026-01-01T10:00:00.000Z',
-        },
-        {
-          _id: 'user_simple_01',
-          email: 'user@gmail.com',
-          role: 'user' as const,
-          status: 'active' as const,
-          isVerified: true,
-          name: 'Rahul',
-          city: 'New Delhi',
-          createdAt: '2026-01-01T10:00:00.000Z',
-        },
-      ],
+      users: [],
     });
   } catch (error: any) {
     return NextResponse.json(

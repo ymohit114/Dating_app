@@ -1,15 +1,10 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
-export interface IProfilePhoto {
-  url: string;
-  isPrimary: boolean;
-  displayOrder: number;
-}
-
 export interface IProfileDocument extends Document {
   userId: mongoose.Types.ObjectId;
-  firstName: string;
-  dateOfBirth: Date;
+  firstName?: string;
+  name?: string;
+  dateOfBirth?: Date;
   gender: 'man' | 'woman' | 'non-binary' | 'other';
   interestedIn: string[];
   bio: string;
@@ -17,12 +12,18 @@ export interface IProfileDocument extends Document {
   country: string;
   occupation?: string;
   education?: string;
+  job?: string;
+  school?: string;
   interests: string[];
+  passions?: string[];
   relationshipGoal: 'Long-term' | 'Short-term' | 'Friendship' | 'Marriage' | 'Not Sure';
-  photos: IProfilePhoto[];
+  photos: any[];
   location: {
     type: 'Point';
     coordinates: [number, number]; // [longitude, latitude]
+    city?: string;
+    state?: string;
+    country?: string;
   };
   isProfileComplete: boolean;
   verificationStatus: 'unverified' | 'pending' | 'verified' | 'rejected';
@@ -33,24 +34,15 @@ export interface IProfileDocument extends Document {
 const ProfileSchema = new Schema<IProfileDocument>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
-    firstName: { type: String, required: true, trim: true, maxLength: 50 },
+    firstName: { type: String, trim: true, maxLength: 50 },
+    name: { type: String, trim: true, maxLength: 50 },
     dateOfBirth: {
       type: Date,
-      required: true,
-      validate: {
-        validator: function (dob: Date) {
-          const ageDiffMs = Date.now() - dob.getTime();
-          const ageDate = new Date(ageDiffMs);
-          const age = Math.abs(ageDate.getUTCFullYear() - 1970);
-          return age >= 18;
-        },
-        message: 'Must be at least 18 years of age to register.',
-      },
     },
     gender: {
       type: String,
       enum: ['man', 'woman', 'non-binary', 'other'],
-      required: true,
+      default: 'man',
     },
     interestedIn: {
       type: [String],
@@ -61,19 +53,19 @@ const ProfileSchema = new Schema<IProfileDocument>(
     country: { type: String, default: 'India', trim: true },
     occupation: { type: String, trim: true, maxLength: 100 },
     education: { type: String, trim: true, maxLength: 100 },
+    job: { type: String, trim: true, maxLength: 100 },
+    school: { type: String, trim: true, maxLength: 100 },
     interests: { type: [String], default: [] },
+    passions: { type: [String], default: [] },
     relationshipGoal: {
       type: String,
       enum: ['Long-term', 'Short-term', 'Friendship', 'Marriage', 'Not Sure'],
       default: 'Long-term',
     },
-    photos: [
-      {
-        url: { type: String, required: true },
-        isPrimary: { type: Boolean, default: false },
-        displayOrder: { type: Number, default: 0 },
-      },
-    ],
+    photos: {
+      type: [Schema.Types.Mixed] as any,
+      default: [],
+    },
     location: {
       type: {
         type: String,
@@ -84,6 +76,9 @@ const ProfileSchema = new Schema<IProfileDocument>(
         type: [Number], // [lng, lat]
         default: [77.2090, 28.6139],
       },
+      city: { type: String, default: 'New Delhi' },
+      state: { type: String, default: 'Delhi' },
+      country: { type: String, default: 'India' },
     },
     isProfileComplete: { type: Boolean, default: false },
     verificationStatus: {

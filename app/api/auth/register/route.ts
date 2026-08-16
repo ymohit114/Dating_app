@@ -4,7 +4,6 @@ import connectToDatabase from '@/lib/mongodb';
 import User from '@/models/User';
 import Profile from '@/models/Profile';
 import { registerSchema } from '@/lib/validations';
-import { INITIAL_CURRENT_PROFILE } from '@/utils/seedData';
 
 export async function POST(req: Request) {
   try {
@@ -18,7 +17,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const { firstName, email, password, dateOfBirth, gender } = validated.data;
+    const { firstName, name, email, password, dateOfBirth, gender } = validated.data;
+    const displayName = (name || firstName).trim();
+
     const conn = await connectToDatabase();
 
     if (conn) {
@@ -42,18 +43,13 @@ export async function POST(req: Request) {
 
       const newProfile = await Profile.create({
         userId: newUser._id,
-        firstName,
+        firstName: displayName,
+        name: displayName,
         dateOfBirth: new Date(dateOfBirth),
         gender,
         interestedIn: gender === 'man' ? ['women'] : ['men'],
-        photos: [
-          {
-            url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800',
-            isPrimary: true,
-            displayOrder: 0,
-          },
-        ],
-        bio: 'Hello! I am new on Elance.',
+        photos: [],
+        bio: '',
         city: 'New Delhi',
         country: 'India',
         relationshipGoal: 'Long-term',
@@ -102,11 +98,12 @@ export async function POST(req: Request) {
     const refreshToken = signRefreshToken(payload);
 
     const simulatedProfile = {
-      ...INITIAL_CURRENT_PROFILE,
       _id: `prof_${Date.now()}`,
       userId: simulatedUserId,
-      firstName,
+      firstName: displayName,
+      name: displayName,
       gender,
+      photos: [],
       isProfileComplete: false,
     };
 

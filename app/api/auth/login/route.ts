@@ -4,7 +4,7 @@ import connectToDatabase from '@/lib/mongodb';
 import User from '@/models/User';
 import Profile from '@/models/Profile';
 import { loginSchema } from '@/lib/validations';
-import { INITIAL_CURRENT_USER, INITIAL_CURRENT_PROFILE } from '@/utils/seedData';
+import { INITIAL_CURRENT_USER } from '@/utils/seedData';
 
 export async function POST(req: Request) {
   try {
@@ -90,8 +90,8 @@ export async function POST(req: Request) {
 
     // Standalone fallback
     const payload = {
-      userId: isSuperAdminEmail ? 'user_superadmin_01' : INITIAL_CURRENT_USER._id,
-      email: cleanEmail || INITIAL_CURRENT_USER.email,
+      userId: isSuperAdminEmail ? 'user_superadmin_01' : `user_${Date.now()}`,
+      email: cleanEmail,
       role: isSuperAdminEmail ? ('superadmin' as const) : isAdminEmail ? ('admin' as const) : ('user' as const),
       isEmailVerified: true,
     };
@@ -102,12 +102,13 @@ export async function POST(req: Request) {
     const response = NextResponse.json({
       success: true,
       user: {
-        ...INITIAL_CURRENT_USER,
         _id: payload.userId,
-        email: cleanEmail || INITIAL_CURRENT_USER.email,
+        email: cleanEmail,
         role: payload.role,
+        status: 'active',
+        isEmailVerified: true,
       },
-      profile: INITIAL_CURRENT_PROFILE,
+      profile: null,
       accessToken,
     });
 
