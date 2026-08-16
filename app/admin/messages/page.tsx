@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   MessageSquare, ShieldAlert, Eye, Search, RefreshCw, 
-  Trash2, User, Clock, CheckCircle2, HeartHandshake 
+  Trash2, User, Clock, CheckCircle2, HeartHandshake, AlertTriangle 
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
 
@@ -75,7 +75,7 @@ export default function AdminMessagesModerationPage() {
   }, []);
 
   const handleDeleteMessage = async (messageId: string) => {
-    if (!confirm('Are you sure you want to delete this message as Admin?')) return;
+    if (!confirm('Are you sure you want to mark this message as deleted?')) return;
     try {
       await api.delete(`/api/messages?messageId=${messageId}`);
       fetchConversations(true);
@@ -103,7 +103,7 @@ export default function AdminMessagesModerationPage() {
             </span>
           </div>
           <p className="text-xs text-[#9CA3AF] mt-1">
-            Real-time chat monitor: View all messages exchanged between matched members.
+            Real-time chat monitor: View all messages exchanged between matched members including deleted messages.
           </p>
         </div>
 
@@ -263,6 +263,11 @@ export default function AdminMessagesModerationPage() {
                               {msg.senderName}
                             </span>
                             <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                            {msg.isDeleted && (
+                              <span className="text-[9px] text-amber-400 font-bold bg-amber-950/80 border border-amber-800/80 px-1.5 py-0.2 rounded">
+                                User Deleted
+                              </span>
+                            )}
                           </div>
 
                           {/* Bubble */}
@@ -270,13 +275,22 @@ export default function AdminMessagesModerationPage() {
                             <div
                               className={`px-4 py-2.5 rounded-2xl text-xs max-w-sm leading-relaxed ${
                                 msg.isDeleted
-                                  ? 'bg-[#1F2937]/50 text-slate-500 italic border border-[#374151]'
+                                  ? 'bg-rose-950/30 text-slate-200 border-2 border-dashed border-red-500/50 shadow-inner'
                                   : isUser1
                                   ? 'bg-[#1F2937] text-white border border-[#374151] rounded-tl-none'
                                   : 'bg-rose-950/60 text-rose-100 border border-rose-800/50 rounded-tr-none'
                               }`}
                             >
-                              <p>{msg.text}</p>
+                              <div className="flex items-baseline gap-1.5 flex-wrap">
+                                {msg.isDeleted && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-600 text-white font-extrabold text-[10px] uppercase tracking-wider shrink-0 shadow-sm">
+                                    [DELETED]
+                                  </span>
+                                )}
+                                <span className={msg.isDeleted ? 'text-slate-200 font-medium' : ''}>
+                                  {msg.text}
+                                </span>
+                              </div>
 
                               {/* Reactions */}
                               {msg.reactions && msg.reactions.length > 0 && (

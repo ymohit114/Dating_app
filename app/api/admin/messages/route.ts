@@ -10,10 +10,6 @@ import { requireAdminAuth } from '@/lib/auth';
 export async function GET(req: Request) {
   try {
     const { user, errorResponse } = requireAdminAuth(req);
-    // Allow admin access
-    if (errorResponse && user?.role !== 'superadmin' && user?.role !== 'moderator') {
-      // In dev fallback allow preview
-    }
 
     const conn = await connectToDatabase();
     if (conn) {
@@ -67,9 +63,9 @@ export async function GET(req: Request) {
                 ? u1Profile?.name || u1User?.email || 'User 1'
                 : u2Profile?.name || u2User?.email || 'User 2',
             receiverId: msg.receiverId?.toString() || '',
-            text: msg.isDeleted ? '🚫 This message was deleted' : msg.text,
+            text: msg.originalText || msg.text || '',
             isDeleted: Boolean(msg.isDeleted),
-            mediaUrl: msg.isDeleted ? undefined : msg.mediaUrl,
+            mediaUrl: msg.mediaUrl,
             reactions: msg.reactions || [],
             createdAt: msg.createdAt ? new Date(msg.createdAt).toISOString() : new Date().toISOString(),
           }));

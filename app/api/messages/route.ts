@@ -77,6 +77,7 @@ export async function POST(req: Request) {
         senderId,
         receiverId: actualReceiverId,
         text: text.trim(),
+        originalText: text.trim(),
         mediaUrl,
         type,
         read: false,
@@ -156,10 +157,10 @@ export async function DELETE(req: Request) {
         return NextResponse.json({ error: 'Cannot delete messages sent by others' }, { status: 403 });
       }
 
+      if (!message.originalText && message.text) {
+        message.originalText = message.text;
+      }
       message.isDeleted = true;
-      message.text = 'This message was deleted';
-      message.mediaUrl = undefined;
-      message.reactions = [];
       await message.save();
 
       socketManager.emit(`chat:deleted`, { messageId, matchId: message.matchId.toString() });

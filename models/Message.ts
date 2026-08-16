@@ -10,6 +10,7 @@ export interface IMessageDocument extends Document {
   senderId: mongoose.Types.ObjectId;
   receiverId: mongoose.Types.ObjectId;
   text: string;
+  originalText?: string;
   mediaUrl?: string;
   type: 'text' | 'image' | 'audio' | 'system' | 'icebreaker';
   read: boolean;
@@ -32,6 +33,7 @@ const MessageSchema = new Schema<IMessageDocument>(
     senderId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     receiverId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     text: { type: String, required: true },
+    originalText: { type: String },
     mediaUrl: { type: String },
     type: { type: String, enum: ['text', 'image', 'audio', 'system', 'icebreaker'], default: 'text' },
     read: { type: Boolean, default: false },
