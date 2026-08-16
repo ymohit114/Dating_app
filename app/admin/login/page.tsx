@@ -9,8 +9,8 @@ function AdminLoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [email, setEmail] = useState('mohit@gmail.com');
-  const [password, setPassword] = useState('1234567890');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -33,7 +33,7 @@ function AdminLoginForm() {
     setError('');
 
     try {
-      const res = await api.post('/api/auth/login', { email, password });
+      const res = await api.post('/api/auth/login', { email: email.trim(), password });
       
       if (res && res.user) {
         // Verify user has admin/moderator/superadmin role
@@ -59,102 +59,106 @@ function AdminLoginForm() {
   };
 
   return (
-    <div className="w-full max-w-md bg-[#111827] border border-[#1F2937] rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/80 space-y-6 relative overflow-hidden my-auto">
-      {/* Top Gradient Bar */}
-      <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-violet-600 via-indigo-500 to-blue-600" />
+    <div className="min-h-screen flex items-center justify-center p-4 bg-[#0B1020] relative overflow-hidden">
+      {/* Subtle Background Glows */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-rose-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-pink-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Brand & Header */}
-      <div className="text-center space-y-2 pt-2">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-600/20 to-indigo-600/20 border border-violet-500/30 text-violet-400 mx-auto flex items-center justify-center shadow-lg shadow-violet-500/10 mb-3">
-          <Shield className="w-7 h-7" />
-        </div>
-        <div className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold tracking-wider uppercase bg-violet-950/60 text-violet-300 border border-violet-800/50 mb-1">
-          ELANCE ADMIN
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-[#F9FAFB]">
-          Control Console
-        </h1>
-        <p className="text-xs text-[#9CA3AF]">
-          Authorized personnel only. Enter your credentials to access system management.
-        </p>
-      </div>
-
-      {/* Error Banner */}
-      {error && (
-        <div className="p-3.5 rounded-2xl bg-red-950/40 border border-red-800/60 text-red-300 text-xs flex items-start gap-2.5">
-          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
-          <span className="leading-relaxed">{error}</span>
-        </div>
-      )}
-
-      {/* Login Form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-[#D1D5DB] block">Admin Email</label>
-          <div className="relative">
-            <Mail className="w-4 h-4 text-[#6B7280] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@elance.app"
-              className="w-full bg-[#0B1020] border border-[#1F2937] text-[#F9FAFB] text-sm pl-10 pr-4 py-2.5 rounded-2xl focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 transition-all font-mono placeholder:text-gray-600"
-            />
+      <div className="w-full max-w-md bg-[#111827] border border-[#1F2937] rounded-3xl p-8 shadow-2xl space-y-6 relative z-10">
+        {/* Header with Admin Shield */}
+        <div className="text-center space-y-3">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-rose-600 to-pink-600 p-0.5 mx-auto shadow-xl shadow-rose-600/30">
+            <div className="w-full h-full bg-[#111827] rounded-[14px] flex items-center justify-center">
+              <Shield className="w-7 h-7 text-rose-500" />
+            </div>
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white tracking-tight">
+              Control Panel Login
+            </h1>
+            <p className="text-xs text-[#9CA3AF] mt-1 font-mono">
+              Elance Admin &amp; Moderation Suite
+            </p>
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-[#D1D5DB] block">Password</label>
-          <div className="relative">
-            <Lock className="w-4 h-4 text-[#6B7280] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type={showPassword ? 'text' : 'password'}
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••"
-              className="w-full bg-[#0B1020] border border-[#1F2937] text-[#F9FAFB] text-sm pl-10 pr-10 py-2.5 rounded-2xl focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 transition-all placeholder:text-gray-600"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#D1D5DB] transition-colors p-1 cursor-pointer"
-              tabIndex={-1}
-            >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
+        {/* Error Alert */}
+        {error && (
+          <div className="p-3.5 rounded-2xl bg-red-950/60 border border-red-800/80 text-red-300 text-xs flex items-center gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+            <span className="leading-relaxed font-medium">{error}</span>
           </div>
-        </div>
+        )}
 
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 hover:from-violet-500 hover:to-blue-500 text-white font-semibold text-sm shadow-lg shadow-violet-600/25 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed mt-2"
-        >
-          {isLoading ? (
-            <span className="flex items-center gap-2">
-              <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-              <span>Authenticating Session...</span>
-            </span>
-          ) : (
-            <>
-              <span>Sign In to Admin Panel</span>
-              <ArrowRight className="w-4 h-4" />
-            </>
-          )}
-        </button>
-      </form>
+        {/* Login Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs font-bold text-[#D1D5DB] tracking-wide uppercase">
+              Admin Email
+            </label>
+            <div className="relative mt-1">
+              <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@example.com"
+                className="w-full bg-[#0B1020] border border-[#1F2937] text-white text-xs pl-10 pr-4 py-3 rounded-2xl focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all font-mono"
+              />
+            </div>
+          </div>
 
-      {/* Security Footer */}
-      <div className="pt-3 border-t border-[#1F2937] text-center space-y-1">
-        <div className="flex items-center justify-center gap-1.5 text-[11px] text-violet-400 font-medium">
-          <KeyRound className="w-3.5 h-3.5" />
-          <span>Protected administrative access</span>
+          <div>
+            <label className="text-xs font-bold text-[#D1D5DB] tracking-wide uppercase">
+              Password
+            </label>
+            <div className="relative mt-1">
+              <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••"
+                className="w-full bg-[#0B1020] border border-[#1F2937] text-white text-xs pl-10 pr-10 py-3 rounded-2xl focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition-all font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors cursor-pointer"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+          >
+            {isLoading ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Authenticating Admin...</span>
+              </>
+            ) : (
+              <>
+                <KeyRound className="w-4 h-4" />
+                <span>Enter Admin Console</span>
+                <ArrowRight className="w-4 h-4 ml-0.5" />
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* Footer Note */}
+        <div className="pt-4 border-t border-[#1F2937] text-center">
+          <p className="text-[11px] text-[#6B7280]">
+            Protected by Elance Role-Based Security. Authorized personnel only.
+          </p>
         </div>
-        <p className="text-[10px] text-[#6B7280]">
-          All access attempts, device telemetry, and audit logs are recorded.
-        </p>
       </div>
     </div>
   );
@@ -162,15 +166,8 @@ function AdminLoginForm() {
 
 export default function AdminLoginPage() {
   return (
-    <div className="min-h-screen w-full bg-[#0B1020] text-[#F9FAFB] flex items-center justify-center p-4 antialiased">
-      <Suspense fallback={
-        <div className="p-8 text-center text-gray-400 text-sm flex items-center gap-2">
-          <span className="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-          <span>Loading Admin Console...</span>
-        </div>
-      }>
-        <AdminLoginForm />
-      </Suspense>
-    </div>
+    <Suspense fallback={<div className="min-h-screen bg-[#0B1020] flex items-center justify-center text-white text-xs">Loading...</div>}>
+      <AdminLoginForm />
+    </Suspense>
   );
 }
