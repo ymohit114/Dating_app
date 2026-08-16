@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   MessageSquare, ShieldAlert, Eye, Search, RefreshCw, 
-  Trash2, User, Clock, CheckCircle2, HeartHandshake, AlertTriangle 
+  Trash2, User, Clock, CheckCircle2, HeartHandshake, 
+  AlertTriangle, Filter, Flame 
 } from 'lucide-react';
 import { api } from '@/lib/api-client';
 
@@ -46,6 +47,7 @@ export default function AdminMessagesModerationPage() {
   const [conversations, setConversations] = useState<AdminConversation[]>([]);
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [onlyDeletedFilter, setOnlyDeletedFilter] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -86,10 +88,19 @@ export default function AdminMessagesModerationPage() {
 
   const filteredConversations = conversations.filter((c) => {
     const text = `${c.user1?.name} ${c.user1?.email} ${c.user2?.name} ${c.user2?.email} ${c.lastMessage}`.toLowerCase();
-    return text.includes(searchTerm.toLowerCase());
+    const matchesSearch = text.includes(searchTerm.toLowerCase());
+    const matchesDeleted = onlyDeletedFilter
+      ? c.messages.some((m) => m.isDeleted)
+      : true;
+    return matchesSearch && matchesDeleted;
   });
 
   const activeConversation = conversations.find((c) => c._id === selectedConvId) || conversations[0];
+
+  const totalDeletedCount = conversations.reduce(
+    (acc, c) => acc + c.messages.filter((m) => m.isDeleted).length,
+    0
+  );
 
   return (
     <div className="space-y-6">
@@ -97,24 +108,44 @@ export default function AdminMessagesModerationPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#1F2937]">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-white tracking-tight">Live User Chat &amp; Conversations</h1>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Live User Chat &amp; Deleted Content Monitor</h1>
             <span className="bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold px-2.5 py-0.5 rounded-full">
               {conversations.length} Active Threads
             </span>
+            {totalDeletedCount > 0 && (
+              <span className="bg-red-950 text-red-400 border border-red-800 text-xs font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                <Trash2 className="w-3 h-3" /> {totalDeletedCount} Deleted by Users
+              </span>
+            )}
           </div>
           <p className="text-xs text-[#9CA3AF] mt-1">
-            Real-time chat monitor: View all messages exchanged between matched members including deleted messages.
+            Real-time chat monitor: Inspect active conversations and view full original content of deleted messages.
           </p>
         </div>
 
-        <button
-          onClick={() => fetchConversations()}
-          disabled={isRefreshing}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#111827] border border-[#1F2937] text-xs font-semibold text-white hover:bg-[#1F2937] transition-all cursor-pointer w-fit"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-rose-400' : 'text-slate-400'}`} />
-          <span>Refresh Live</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Deleted Filter Toggle */}
+          <button
+            onClick={() => setOnlyDeletedFilter(!onlyDeletedFilter)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+              onlyDeletedFilter
+                ? 'bg-red-600 text-white border-red-500 shadow-md shadow-red-600/30'
+                : 'bg-[#111827] border-[#1F2937] text-slate-400 hover:text-white'
+            }`}
+          >
+            <Filter className="w-3.5 h-3.5" />
+            <span>Show Only Deleted ({totalDeletedCount})</span>
+          </button>
+
+          <button
+            onClick={() => fetchConversations()}
+            disabled={isRefreshing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#111827] border border-[#1F2937] text-xs font-semibold text-white hover:bg-[#1F2937] transition-all cursor-pointer w-fit"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-rose-400' : 'text-slate-400'}`} />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -136,7 +167,7 @@ export default function AdminMessagesModerationPage() {
         /* 2-Column Split: Conversations List + Transcript Inspector */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Conversations List (5 cols) */}
-          <div className="lg:col-span-5 bg-[#111827] border border-[#1F2937] rounded-2xl overflow-hidden shadow-sm flex flex-col h-[650px]">
+          <div className="lg:col-span-5 bg-[#111827] border border-[#1F2937] rounded-2xl overflow-hidden shadow-sm flex flex-col h-[680px]">
             {/* Search */}
             <div className="p-3 border-b border-[#1F2937] bg-[#0B1020]">
               <div className="relative">
@@ -155,13 +186,15 @@ export default function AdminMessagesModerationPage() {
             <div className="flex-1 overflow-y-auto divide-y divide-[#1F2937]/80">
               {filteredConversations.map((conv) => {
                 const isSelected = (activeConversation?._id === conv._id);
+                const hasDeleted = conv.messages.some((m) => m.isDeleted);
+
                 return (
                   <div
                     key={conv._id}
                     onClick={() => setSelectedConvId(conv._id)}
                     className={`p-4 transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-[#1F2937]/80 border-l-4 border-rose-500'
+                        ? 'bg-[#1F2937]/90 border-l-4 border-rose-500'
                         : 'hover:bg-[#1F2937]/40'
                     }`}
                   >
@@ -182,14 +215,21 @@ export default function AdminMessagesModerationPage() {
                             className="inline-block h-7 w-7 rounded-full ring-2 ring-[#111827] object-cover"
                           />
                         </div>
-                        <span className="text-xs font-bold text-white truncate max-w-[160px]">
+                        <span className="text-xs font-bold text-white truncate max-w-[150px]">
                           {conv.user1?.name} &amp; {conv.user2?.name}
                         </span>
                       </div>
 
-                      <span className="text-[10px] font-semibold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full">
-                        {conv.messageCount} msgs
-                      </span>
+                      <div className="flex items-center gap-1">
+                        {hasDeleted && (
+                          <span className="text-[10px] font-extrabold text-red-400 bg-red-950/80 border border-red-800/80 px-1.5 py-0.5 rounded">
+                            Deleted Msg
+                          </span>
+                        )}
+                        <span className="text-[10px] font-semibold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full">
+                          {conv.messageCount} msgs
+                        </span>
+                      </div>
                     </div>
 
                     <p className="text-xs text-[#9CA3AF] truncate mt-1">
@@ -207,7 +247,7 @@ export default function AdminMessagesModerationPage() {
           </div>
 
           {/* Right Column: Live Message Transcript Viewer (7 cols) */}
-          <div className="lg:col-span-7 bg-[#111827] border border-[#1F2937] rounded-2xl overflow-hidden shadow-sm flex flex-col h-[650px]">
+          <div className="lg:col-span-7 bg-[#111827] border border-[#1F2937] rounded-2xl overflow-hidden shadow-sm flex flex-col h-[680px]">
             {activeConversation ? (
               <>
                 {/* Transcript Header */}
@@ -263,48 +303,55 @@ export default function AdminMessagesModerationPage() {
                               {msg.senderName}
                             </span>
                             <span>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                            {msg.isDeleted && (
-                              <span className="text-[9px] text-amber-400 font-bold bg-amber-950/80 border border-amber-800/80 px-1.5 py-0.2 rounded">
-                                User Deleted
-                              </span>
-                            )}
                           </div>
 
-                          {/* Bubble */}
-                          <div className="group relative flex items-center gap-2">
-                            <div
-                              className={`px-4 py-2.5 rounded-2xl text-xs max-w-sm leading-relaxed ${
-                                msg.isDeleted
-                                  ? 'bg-rose-950/30 text-slate-200 border-2 border-dashed border-red-500/50 shadow-inner'
-                                  : isUser1
-                                  ? 'bg-[#1F2937] text-white border border-[#374151] rounded-tl-none'
-                                  : 'bg-rose-950/60 text-rose-100 border border-rose-800/50 rounded-tr-none'
-                              }`}
-                            >
-                              <div className="flex items-baseline gap-1.5 flex-wrap">
-                                {msg.isDeleted && (
-                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-600 text-white font-extrabold text-[10px] uppercase tracking-wider shrink-0 shadow-sm">
-                                    [DELETED]
+                          {/* Message Body */}
+                          <div className="group relative flex items-center gap-2 max-w-[85%] sm:max-w-md">
+                            {msg.isDeleted ? (
+                              /* Distinct Deleted Message Box with Original Content */
+                              <div className="w-full p-3.5 rounded-2xl bg-red-950/40 border-2 border-dashed border-red-500/60 shadow-lg space-y-2">
+                                <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-red-500/20">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-600 text-white font-black text-[10px] uppercase tracking-wider shadow-sm">
+                                    <Trash2 className="w-3 h-3" /> DELETED MESSAGE
                                   </span>
-                                )}
-                                <span className={msg.isDeleted ? 'text-slate-200 font-medium' : ''}>
-                                  {msg.text}
-                                </span>
-                              </div>
-
-                              {/* Reactions */}
-                              {msg.reactions && msg.reactions.length > 0 && (
-                                <div className="flex gap-1 mt-1.5 pt-1 border-t border-white/10">
-                                  {msg.reactions.map((r, i) => (
-                                    <span key={i} className="text-xs bg-black/40 px-1.5 py-0.5 rounded-full">
-                                      {r.emoji}
-                                    </span>
-                                  ))}
+                                  <span className="text-[10px] text-red-300/80 font-mono">
+                                    Removed by user on app
+                                  </span>
                                 </div>
-                              )}
-                            </div>
+                                <div className="space-y-1">
+                                  <span className="text-[10px] font-bold text-red-400 uppercase tracking-wide block">
+                                    Original Content Was:
+                                  </span>
+                                  <div className="p-2.5 bg-black/60 rounded-xl border border-red-500/30 text-white text-xs font-mono leading-relaxed select-all">
+                                    &ldquo;{msg.text}&rdquo;
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Regular Message Bubble */
+                              <div
+                                className={`px-4 py-2.5 rounded-2xl text-xs leading-relaxed ${
+                                  isUser1
+                                    ? 'bg-[#1F2937] text-white border border-[#374151] rounded-tl-none'
+                                    : 'bg-rose-950/60 text-rose-100 border border-rose-800/50 rounded-tr-none'
+                                }`}
+                              >
+                                <p>{msg.text}</p>
 
-                            {/* Admin Delete Action */}
+                                {/* Reactions */}
+                                {msg.reactions && msg.reactions.length > 0 && (
+                                  <div className="flex gap-1 mt-1.5 pt-1 border-t border-white/10">
+                                    {msg.reactions.map((r, i) => (
+                                      <span key={i} className="text-xs bg-black/40 px-1.5 py-0.5 rounded-full">
+                                        {r.emoji}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Admin Delete Action for non-deleted messages */}
                             {!msg.isDeleted && (
                               <button
                                 onClick={() => handleDeleteMessage(msg._id)}
