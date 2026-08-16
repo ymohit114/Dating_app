@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   MessageSquare, ShieldAlert, Eye, Search, RefreshCw, 
   Trash2, User, Clock, CheckCircle2, HeartHandshake, 
@@ -57,9 +57,13 @@ export default function AdminMessagesModerationPage() {
       const res = await api.get('/api/admin/messages');
       if (res && res.conversations) {
         setConversations(res.conversations);
-        if (!selectedConvId && res.conversations.length > 0) {
-          setSelectedConvId(res.conversations[0]._id);
-        }
+        // Persist the current user's selection without resetting to index 0 on background refresh
+        setSelectedConvId((prev) => {
+          if (prev && res.conversations.some((c: AdminConversation) => c._id === prev)) {
+            return prev;
+          }
+          return res.conversations[0]?._id || null;
+        });
       }
     } catch (err) {
       console.error('Failed to fetch admin messages:', err);
@@ -185,7 +189,7 @@ export default function AdminMessagesModerationPage() {
             {/* List */}
             <div className="flex-1 overflow-y-auto divide-y divide-[#1F2937]/80">
               {filteredConversations.map((conv) => {
-                const isSelected = (activeConversation?._id === conv._id);
+                const isSelected = (selectedConvId ? conv._id === selectedConvId : activeConversation?._id === conv._id);
                 const hasDeleted = conv.messages.some((m) => m.isDeleted);
 
                 return (

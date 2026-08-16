@@ -51,6 +51,9 @@ export async function GET(req: Request) {
         const u1User = userMap.get(u1Id);
         const u2User = userMap.get(u2Id);
 
+        const u1Name = u1Profile?.name || u1Profile?.firstName || u1User?.email?.split('@')[0] || 'User 1';
+        const u2Name = u2Profile?.name || u2Profile?.firstName || u2User?.email?.split('@')[0] || 'User 2';
+
         const matchIdStr = m._id.toString();
         const matchMessages = allMessages
           .filter((msg: any) => msg.matchId.toString() === matchIdStr)
@@ -60,8 +63,8 @@ export async function GET(req: Request) {
             senderId: msg.senderId.toString(),
             senderName:
               msg.senderId.toString() === u1Id
-                ? u1Profile?.name || u1User?.email || 'User 1'
-                : u2Profile?.name || u2User?.email || 'User 2',
+                ? u1Name
+                : u2Name,
             receiverId: msg.receiverId?.toString() || '',
             text: msg.originalText || msg.text || '',
             isDeleted: Boolean(msg.isDeleted),
@@ -79,14 +82,14 @@ export async function GET(req: Request) {
           messageCount: matchMessages.length,
           user1: {
             _id: u1Id,
-            name: u1Profile?.name || 'Mohit Yadav',
-            email: u1User?.email || 'mohit@gmail.com',
+            name: u1Name,
+            email: u1User?.email || '',
             photo: u1Profile?.photos?.[0] || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
           },
           user2: {
             _id: u2Id,
-            name: u2Profile?.name || 'Rahul',
-            email: u2User?.email || 'user@gmail.com',
+            name: u2Name,
+            email: u2User?.email || '',
             photo: u2Profile?.photos?.[0] || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
           },
           messages: matchMessages,
