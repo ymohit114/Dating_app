@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { isAuthorizedAdminDevice, setDeviceLockCookie, ADMIN_DEVICE_SECRET } from '@/lib/deviceLock';
 
 function decodeJwtPayload(token: string): { userId?: string; email?: string; role?: string; exp?: number } | null {
   try {
@@ -42,33 +41,6 @@ export function middleware(request: NextRequest) {
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-  // Check if request has unlock key in URL query parameter
-  const unlockQuery = request.nextUrl.searchParams.get('unlock') || request.nextUrl.searchParams.get('key');
-  if (unlockQuery === ADMIN_DEVICE_SECRET) {
-    setDeviceLockCookie(response.headers);
-  }
-
-  // ── 0. HARDWARE DEVICE LOCKDOWN FOR ADMIN ──────────────────────────────────
-  const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
-  const isLoginPage = pathname === '/admin/login';
-
-  if (isAdminRoute && !isLoginPage) {
-    const isThisLaptop = isAuthorizedAdminDevice(request);
-    if (!isThisLaptop) {
-      if (pathname.startsWith('/api/admin')) {
-        return NextResponse.json(
-          { error: 'Security Exception: This device is not authorized to access the Admin Console.' },
-          { status: 403 }
-        );
-      }
-      // Redirect to login page
-      const loginUrl = new URL('/admin/login', request.url);
-      loginUrl.searchParams.set('redirect', pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-  }
-  // ──────────────────────────────────────────────────────────────────────────
-
   // 1. Admin API Route Protection (/api/admin/*)
   if (pathname.startsWith('/api/admin')) {
     const payload = token ? decodeJwtPayload(token) : null;
@@ -85,6 +57,7 @@ export function middleware(request: NextRequest) {
 
   // 2. Admin UI Protection (/admin/*)
   if (pathname.startsWith('/admin')) {
+    const isLoginPage = pathname === '/admin/login';
     const payload = token ? decodeJwtPayload(token) : null;
     const hasAdminRole = payload && ['moderator', 'admin', 'superadmin'].includes(payload.role || '');
 
@@ -95,6 +68,7 @@ export function middleware(request: NextRequest) {
       return response;
     }
 
+    // Require admin token for any other /admin page
     if (!token || !payload) {
       const loginUrl = new URL('/admin/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
