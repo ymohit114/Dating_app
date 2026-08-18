@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+const ADMIN_SECRET_KEY = 'mohit_laptop_access_2026';
+const ADMIN_DEVICE_COOKIE = 'elance_laptop_cert';
+
 function decodeJwtPayload(token: string): { userId?: string; email?: string; role?: string; exp?: number } | null {
   try {
     const parts = token.split('.');
@@ -41,6 +44,43 @@ export function middleware(request: NextRequest) {
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
+  // ── 0. HARDWARE DEVICE LOCKDOWN (Laptop-Only Access) ──────────────────────
+  const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
+  
+  if (isAdminRoute) {
+    const host = request.headers.get('host') || '';
+    const isLocalhost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
+
+    const deviceCookie = request.cookies.get(ADMIN_DEVICE_COOKIE)?.value;
+    const queryKey = request.nextUrl.searchParams.get('key') || request.nextUrl.searchParams.get('secret');
+
+    const isThisAuthorizedLaptop = isLocalhost || deviceCookie === ADMIN_SECRET_KEY || queryKey === ADMIN_SECRET_KEY;
+
+    // If request contains the unlock key, permanently authorize this browser
+    if (queryKey === ADMIN_SECRET_KEY) {
+      const isProd = process.env.NODE_ENV === 'production';
+      response.cookies.set(ADMIN_DEVICE_COOKIE, ADMIN_SECRET_KEY, {
+        path: '/',
+        maxAge: 365 * 24 * 60 * 60, // 1 year
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: isProd,
+      });
+    }
+
+    // If NOT this authorized laptop, block completely (404 Page Not Found)
+    if (!isThisAuthorizedLaptop) {
+      if (pathname.startsWith('/api/admin')) {
+        return NextResponse.json(
+          { error: 'Security Exception: This device is not authorized to access the Admin Console.' },
+          { status: 403 }
+        );
+      }
+      return NextResponse.rewrite(new URL('/not-found', request.url));
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   // 1. Admin API Protection (/api/admin/*)
   if (pathname.startsWith('/api/admin')) {
     const payload = token ? decodeJwtPayload(token) : null;
@@ -57,7 +97,6 @@ export function middleware(request: NextRequest) {
 
   // 2. Admin UI Protection (/admin/*)
   if (pathname.startsWith('/admin')) {
-    // Never block or redirect-loop on the login page
     if (pathname === '/admin/login') {
       return response;
     }
@@ -65,7 +104,6 @@ export function middleware(request: NextRequest) {
     const payload = token ? decodeJwtPayload(token) : null;
     const hasAdminRole = payload && ['moderator', 'admin', 'superadmin'].includes(payload.role || '');
 
-    // Any other /admin page requires active admin role
     if (!token || !payload || !hasAdminRole) {
       const loginUrl = new URL('/admin/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
