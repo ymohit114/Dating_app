@@ -37,6 +37,9 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  const payload = token ? decodeJwtPayload(token) : null;
+  const hasAdminRole = Boolean(payload && ['moderator', 'admin', 'superadmin'].includes(payload.role || ''));
+
   // Base security response headers
   const response = NextResponse.next();
   response.headers.set('X-Content-Type-Options', 'nosniff');
@@ -44,49 +47,22 @@ export function middleware(request: NextRequest) {
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-  // ── 0. HARDWARE DEVICE LOCKDOWN (Laptop-Only Access) ──────────────────────
-  const isAdminRoute = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
-  
-  if (isAdminRoute) {
-    const host = request.headers.get('host') || '';
-    const isLocalhost = host.startsWith('localhost') || host.startsWith('127.0.0.1');
-
-    const deviceCookie = request.cookies.get(ADMIN_DEVICE_COOKIE)?.value;
-    const queryKey = request.nextUrl.searchParams.get('key') || request.nextUrl.searchParams.get('secret');
-
-    const isThisAuthorizedLaptop = isLocalhost || deviceCookie === ADMIN_SECRET_KEY || queryKey === ADMIN_SECRET_KEY;
-
-    // If request contains the unlock key, permanently authorize this browser
-    if (queryKey === ADMIN_SECRET_KEY) {
-      const isProd = process.env.NODE_ENV === 'production';
-      response.cookies.set(ADMIN_DEVICE_COOKIE, ADMIN_SECRET_KEY, {
-        path: '/',
-        maxAge: 365 * 24 * 60 * 60, // 1 year
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: isProd,
-      });
-    }
-
-    // If NOT this authorized laptop, block completely (404 Page Not Found)
-    if (!isThisAuthorizedLaptop) {
-      if (pathname.startsWith('/api/admin')) {
-        return NextResponse.json(
-          { error: 'Security Exception: This device is not authorized to access the Admin Console.' },
-          { status: 403 }
-        );
-      }
-      return NextResponse.rewrite(new URL('/not-found', request.url));
-    }
+  // Check for unlock query key and stamp persistent cookie
+  const queryKey = request.nextUrl.searchParams.get('key') || request.nextUrl.searchParams.get('secret') || request.nextUrl.searchParams.get('unlock');
+  if (queryKey === ADMIN_SECRET_KEY) {
+    const isProd = process.env.NODE_ENV === 'production';
+    response.cookies.set(ADMIN_DEVICE_COOKIE, ADMIN_SECRET_KEY, {
+      path: '/',
+      maxAge: 365 * 24 * 60 * 60, // 1 year
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: isProd,
+    });
   }
-  // ──────────────────────────────────────────────────────────────────────────
 
   // 1. Admin API Protection (/api/admin/*)
   if (pathname.startsWith('/api/admin')) {
-    const payload = token ? decodeJwtPayload(token) : null;
-    const hasAdminRole = payload && ['moderator', 'admin', 'superadmin'].includes(payload.role || '');
-
-    if (!token || !payload || !hasAdminRole) {
+    if (!hasAdminRole) {
       return NextResponse.json(
         { error: 'Forbidden. Admin privileges required.' },
         { status: 403 }
@@ -97,14 +73,13 @@ export function middleware(request: NextRequest) {
 
   // 2. Admin UI Protection (/admin/*)
   if (pathname.startsWith('/admin')) {
+    // Always serve the admin login page
     if (pathname === '/admin/login') {
       return response;
     }
 
-    const payload = token ? decodeJwtPayload(token) : null;
-    const hasAdminRole = payload && ['moderator', 'admin', 'superadmin'].includes(payload.role || '');
-
-    if (!token || !payload || !hasAdminRole) {
+    // Require active admin login for any other admin screen
+    if (!hasAdminRole) {
       const loginUrl = new URL('/admin/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
@@ -118,8 +93,7 @@ export function middleware(request: NextRequest) {
   const isProtectedUserRoute = protectedUserRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
   if (isProtectedUserRoute) {
-    const payload = token ? decodeJwtPayload(token) : null;
-    if (!token || !payload || !payload.userId) {
+    if (!payload || !payload.userId) {
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
