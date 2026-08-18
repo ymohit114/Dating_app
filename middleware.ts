@@ -25,7 +25,7 @@ function decodeJwtPayload(token: string): { userId?: string; email?: string; rol
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Extract access token from httpOnly cookie or Bearer header
+  // Extract access token from cookie or Bearer header
   let token = request.cookies.get('elance_access_token')?.value;
   if (!token) {
     const authHeader = request.headers.get('authorization');
@@ -41,7 +41,7 @@ export function middleware(request: NextRequest) {
   response.headers.set('X-XSS-Protection', '1; mode=block');
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-  // 1. Admin API Route Protection (/api/admin/*)
+  // 1. Admin API Protection (/api/admin/*)
   if (pathname.startsWith('/api/admin')) {
     const payload = token ? decodeJwtPayload(token) : null;
     const hasAdminRole = payload && ['moderator', 'admin', 'superadmin'].includes(payload.role || '');
@@ -57,29 +57,21 @@ export function middleware(request: NextRequest) {
 
   // 2. Admin UI Protection (/admin/*)
   if (pathname.startsWith('/admin')) {
-    const isLoginPage = pathname === '/admin/login';
-    const payload = token ? decodeJwtPayload(token) : null;
-    const hasAdminRole = payload && ['moderator', 'admin', 'superadmin'].includes(payload.role || '');
-
-    if (isLoginPage) {
-      if (hasAdminRole) {
-        return NextResponse.redirect(new URL('/admin/dashboard', request.url));
-      }
+    // Never block or redirect-loop on the login page
+    if (pathname === '/admin/login') {
       return response;
     }
 
-    // Require admin token for any other /admin page
-    if (!token || !payload) {
+    const payload = token ? decodeJwtPayload(token) : null;
+    const hasAdminRole = payload && ['moderator', 'admin', 'superadmin'].includes(payload.role || '');
+
+    // Any other /admin page requires active admin role
+    if (!token || !payload || !hasAdminRole) {
       const loginUrl = new URL('/admin/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
     }
 
-    if (!hasAdminRole) {
-      const loginUrl = new URL('/admin/login', request.url);
-      loginUrl.searchParams.set('error', 'insufficient_privileges');
-      return NextResponse.redirect(loginUrl);
-    }
     return response;
   }
 
