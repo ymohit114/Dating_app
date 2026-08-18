@@ -59,14 +59,14 @@ export async function GET(req: Request) {
           managedProfile: {
             userId: managedId,
             name: managedProf?.name || managedProf?.firstName || 'Managed Model',
-            photo: resolveToCloudinaryUrl(managedProf?.photos?.[0] || managedProf?.profilePicture),
+            photo: resolveToCloudinaryUrl(managedProf?.photos?.[0] || (managedProf as any)?.profilePicture),
           },
           realUser: {
             userId: realUserId,
             name: realProf?.name || realProf?.firstName || 'Registered Member',
             email: realUserDoc?.email || 'user@example.com',
-            photo: resolveToCloudinaryUrl(realProf?.photos?.[0] || realProf?.profilePicture),
-            city: realProf?.city || realProf?.location?.city || 'New Delhi',
+            photo: resolveToCloudinaryUrl(realProf?.photos?.[0] || (realProf as any)?.profilePicture),
+            city: realProf?.city || (realProf as any)?.location?.city || 'New Delhi',
           },
           lastMessage: m.lastMessage,
           lastMessageAt: m.lastMessageAt ? new Date(m.lastMessageAt).toISOString() : new Date().toISOString(),

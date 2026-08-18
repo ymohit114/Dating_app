@@ -57,11 +57,11 @@ class SlidingWindowRateLimiter {
 
   private cleanup(): void {
     const now = Date.now();
-    for (const [key, record] of this.cache.entries()) {
+    this.cache.forEach((record, key) => {
       if (now > record.resetTime) {
         this.cache.delete(key);
       }
-    }
+    });
   }
 }
 
