@@ -7,7 +7,7 @@ export const ADMIN_DEVICE_SECRET = process.env.ADMIN_DEVICE_SECRET || 'elance_au
  * Checks whether the incoming request originates from this authorized laptop/device.
  */
 export function isAuthorizedAdminDevice(req: Request | any): boolean {
-  // 1. Check if the request is from localhost / 127.0.0.1 (This laptop)
+  // 1. Check if the request is from localhost / 127.0.0.1 (This laptop dev server)
   const host = req.headers.get ? req.headers.get('host') || '' : req.headers?.host || '';
   const forwarded = req.headers.get ? req.headers.get('x-forwarded-for') || '' : req.headers?.['x-forwarded-for'] || '';
   
@@ -19,7 +19,9 @@ export function isAuthorizedAdminDevice(req: Request | any): boolean {
     forwarded === '127.0.0.1' ||
     forwarded === '::1';
 
-  // 2. Check for Master Device Cookie or Header
+  if (isLocalHost) return true;
+
+  // 2. Check for Master Device Cookie
   let deviceCookie = '';
   if (req.cookies?.get) {
     deviceCookie = req.cookies.get(ADMIN_DEVICE_COOKIE)?.value || '';
@@ -29,13 +31,20 @@ export function isAuthorizedAdminDevice(req: Request | any): boolean {
     if (match) deviceCookie = match[1];
   }
 
+  // 3. Check for Header or Query Parameter Unlock
   const deviceHeader = req.headers?.get ? req.headers.get('x-admin-device-key') || '' : req.headers?.['x-admin-device-key'] || '';
+
+  let queryKey = '';
+  if (req.nextUrl?.searchParams) {
+    queryKey = req.nextUrl.searchParams.get('unlock') || req.nextUrl.searchParams.get('key') || '';
+  }
 
   const hasValidSecret = 
     deviceCookie === ADMIN_DEVICE_SECRET || 
-    deviceHeader === ADMIN_DEVICE_SECRET;
+    deviceHeader === ADMIN_DEVICE_SECRET ||
+    queryKey === ADMIN_DEVICE_SECRET;
 
-  return isLocalHost || hasValidSecret;
+  return hasValidSecret;
 }
 
 /**
@@ -49,7 +58,7 @@ export function setDeviceLockCookie(headers: Headers): void {
     `Path=/`,
     `Max-Age=${maxAge}`,
     `HttpOnly`,
-    `SameSite=Strict`,
+    `SameSite=Lax`,
   ];
 
   if (isProd) {
