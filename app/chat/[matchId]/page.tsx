@@ -43,16 +43,16 @@ export default function ChatDetailPage() {
   const otherUserId = otherUser?.userId || otherUser?._id || '';
 
   return (
-    <div className="flex-1 flex max-w-6xl mx-auto w-full border-x border-zinc-800/80 bg-zinc-950 min-h-[calc(100vh-64px)] overflow-hidden">
+    <div className="flex max-w-6xl mx-auto w-full border-x border-zinc-800/80 bg-zinc-950 h-[calc(100vh-64px)] max-h-[calc(100vh-64px)] overflow-hidden">
       {/* Sidebar List (hidden on mobile when chat open) */}
-      <div className="hidden md:block w-96 flex-shrink-0">
+      <div className="hidden md:block w-96 flex-shrink-0 h-full overflow-hidden">
         <ChatList matches={matches} activeMatchId={matchId} />
       </div>
 
       {/* Main Chat Window */}
-      <div className="flex-1 flex flex-col min-w-0 bg-zinc-950">
+      <div className="flex-1 flex flex-col min-w-0 h-full bg-zinc-950 overflow-hidden">
         {/* Mobile back link bar */}
-        <div className="md:hidden px-4 py-2.5 bg-zinc-950 border-b border-zinc-800 flex items-center justify-between">
+        <div className="md:hidden px-4 py-2 bg-zinc-950 border-b border-zinc-800 flex items-center justify-between shrink-0">
           <Link href="/matches" className="flex items-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-white">
             <ArrowLeft className="w-4 h-4" /> All Matches
           </Link>
@@ -64,22 +64,24 @@ export default function ChatDetailPage() {
         </div>
 
         {matchDetails ? (
-          <ChatWindow
-            match={matchDetails}
-            messages={messages}
-            currentUserId={user?._id || ''}
-            isTyping={isTyping}
-            onSendMessage={(text, media) =>
-              sendMessage(
-                text,
-                media,
-                user?._id || '',
-                otherUserId
-              )
-            }
-            onDeleteMessage={(messageId) => deleteMessage(messageId)}
-            onReactToMessage={(messageId, emoji) => reactToMessage(messageId, emoji, user?._id || '')}
-          />
+          <div className="flex-1 min-h-0 h-full overflow-hidden flex flex-col">
+            <ChatWindow
+              match={matchDetails}
+              messages={messages}
+              currentUserId={user?._id || ''}
+              isTyping={isTyping}
+              onSendMessage={(text, media) =>
+                sendMessage(
+                  text,
+                  media,
+                  user?._id || '',
+                  otherUserId
+                )
+              }
+              onDeleteMessage={(messageId) => deleteMessage(messageId)}
+              onReactToMessage={(messageId, emoji) => reactToMessage(messageId, emoji, user?._id || '')}
+            />
+          </div>
         ) : isLoadingMatch ? (
           <div className="flex-1 flex items-center justify-center p-8 text-center text-zinc-400 text-xs">
             <span className="w-4 h-4 border-2 border-rose-500 border-t-transparent rounded-full animate-spin mr-2" />

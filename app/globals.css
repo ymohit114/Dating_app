@@ -3,21 +3,28 @@
 @tailwind utilities;
 
 :root {
-  --background: #FAF6F1;
-  --foreground: #1F1A1C;
-  --plum: #8B2942;
-  --clay: #E8DDD2;
-  --gold: #C9A24B;
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 html, body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  min-height: -webkit-fill-available;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #09090b;
+  color: #f4f4f5;
+  overflow-x: hidden;
+}
+
+/* Touch friendly tap highlights */
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 a {
@@ -29,6 +36,7 @@ button {
   background: transparent;
   border: none;
   font-family: inherit;
+  touch-action: manipulation;
 }
 
 .font-serif {
@@ -37,8 +45,8 @@ button {
 
 /* Custom smooth scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -46,12 +54,12 @@ button {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.3);
+  background: rgba(113, 113, 122, 0.4);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.6);
+  background: rgba(161, 161, 170, 0.6);
 }
 
 .scrollbar-none::-webkit-scrollbar {

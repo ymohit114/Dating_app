@@ -1,127 +1,98 @@
 'use client';
 
-import React from 'react';
-import { AdminSidebar } from '@/components/admin/AdminSidebar';
-import { MetricCard } from '@/components/admin/MetricCard';
-import { formatCurrencyINR } from '@/utils/formatters';
-import { CreditCard, TrendingUp, Sparkles, Crown, Zap, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { CreditCard, TrendingUp, Sparkles, Crown, Zap, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 export default function AdminSubscriptionsPage() {
-  const transactions = [
-    {
-      id: 'tx_101',
-      user: 'Alex Morgan',
-      plan: 'Tinder Gold (Monthly)',
-      amount: 799,
-      status: 'success',
-      date: '2026-08-16 14:22',
-      method: 'Razorpay UPI',
-    },
-    {
-      id: 'tx_102',
-      user: 'Elena Rostova',
-      plan: 'Tinder Platinum (12 Months)',
-      amount: 5999,
-      status: 'success',
-      date: '2026-08-16 11:05',
-      method: 'Razorpay Card',
-    },
-    {
-      id: 'tx_103',
-      user: 'Maya Sharma',
-      plan: '5 Profile Boosts Pack',
-      amount: 499,
-      status: 'success',
-      date: '2026-08-15 19:40',
-      method: 'Razorpay NetBanking',
-    },
-    {
-      id: 'tx_104',
-      user: 'Rohan Verma',
-      plan: 'Tinder Gold (Monthly)',
-      amount: 799,
-      status: 'success',
-      date: '2026-08-15 16:12',
-      method: 'Razorpay UPI',
-    },
-  ];
+  const [transactions] = useState<any[]>([]);
 
   return (
-    <div className="flex flex-1 min-h-[calc(100vh-64px)] bg-zinc-950">
-      <AdminSidebar />
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-white tracking-tight">Revenue &amp; Subscriptions</h1>
+        <p className="text-xs text-slate-400 mt-1">
+          Track verified Razorpay gateway subscriptions, active tier distributions, and conversion rates.
+        </p>
+      </div>
 
-      <div className="flex-1 p-6 sm:p-8 space-y-6 overflow-y-auto">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white">Revenue & Subscriptions</h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            Track Razorpay gateway settlements, active tier distributions, and conversion rates
-          </p>
-        </div>
-
-        {/* Metrics Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <MetricCard
-            title="Monthly Recurring Revenue"
-            value={formatCurrencyINR(592000)}
-            change="+18.4%"
-            icon={TrendingUp}
-            color="emerald"
-          />
-          <MetricCard
-            title="Active Gold Subscribers"
-            value="1,850"
-            change="+9.2%"
-            icon={Sparkles}
-            color="amber"
-          />
-          <MetricCard
-            title="Active Platinum VIPs"
-            value="720"
-            change="+24.8%"
-            icon={Crown}
-            color="purple"
-          />
-        </div>
-
-        {/* Transactions Table */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl overflow-hidden shadow-xl space-y-4 p-6">
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-emerald-400" />
-            Recent Razorpay Transactions
-          </h3>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-zinc-300">
-              <thead className="bg-zinc-950 text-zinc-400 uppercase font-semibold text-[10px] tracking-wider border-b border-zinc-800">
-                <tr>
-                  <th className="px-4 py-3">Transaction ID</th>
-                  <th className="px-4 py-3">User</th>
-                  <th className="px-4 py-3">Plan / Product</th>
-                  <th className="px-4 py-3">Amount</th>
-                  <th className="px-4 py-3">Payment Method</th>
-                  <th className="px-4 py-3">Timestamp</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800/60">
-                {transactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-zinc-850/50 transition-colors">
-                    <td className="px-4 py-3 font-mono text-zinc-400">{tx.id}</td>
-                    <td className="px-4 py-3 font-bold text-white">{tx.user}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-zinc-200">{tx.plan}</span>
-                    </td>
-                    <td className="px-4 py-3 font-bold text-emerald-400">
-                      {formatCurrencyINR(tx.amount)}
-                    </td>
-                    <td className="px-4 py-3 text-zinc-400">{tx.method}</td>
-                    <td className="px-4 py-3 text-zinc-500">{tx.date}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Plans Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="p-5 rounded-2xl bg-[#111827] border border-[#1F2937] space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-300">Free Tier</span>
+            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-800/40">Active</span>
           </div>
+          <div className="text-2xl font-bold text-white">₹0</div>
+          <p className="text-[11px] text-slate-400">Default tier for all registered members</p>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-[#111827] border border-[#1F2937] space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-amber-400 flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5" /> Gold Tier
+            </span>
+            <span className="text-[10px] font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-800/40">Razorpay</span>
+          </div>
+          <div className="text-2xl font-bold text-white">₹799 / mo</div>
+          <p className="text-[11px] text-slate-400">Unlimited likes &amp; see who liked you</p>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-[#111827] border border-[#1F2937] space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-violet-400 flex items-center gap-1">
+              <Crown className="w-3.5 h-3.5" /> Platinum Tier
+            </span>
+            <span className="text-[10px] font-bold text-violet-400 bg-violet-950/60 px-2 py-0.5 rounded-full border border-violet-800/40">Razorpay</span>
+          </div>
+          <div className="text-2xl font-bold text-white">₹1,499 / mo</div>
+          <p className="text-[11px] text-slate-400">Priority likes &amp; message before match</p>
         </div>
       </div>
+
+      {/* Transactions Table / Empty State */}
+      {transactions.length === 0 ? (
+        <div className="p-12 text-center bg-[#111827] border border-[#1F2937] rounded-2xl space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-amber-950/40 border border-amber-800/40 text-amber-400 mx-auto flex items-center justify-center">
+            <CreditCard className="w-6 h-6" />
+          </div>
+          <h2 className="text-sm font-bold text-white">No Paid Transactions Yet</h2>
+          <p className="text-xs text-[#9CA3AF] max-w-sm mx-auto">
+            When users upgrade their subscription plans via Razorpay gateway, real payment signatures and ledger telemetry will appear here.
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-2xl bg-[#111827] border border-[#1F2937] overflow-hidden shadow-sm">
+          <table className="w-full text-left text-xs text-slate-300">
+            <thead className="bg-[#0B1020] text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-[#1F2937]">
+              <tr>
+                <th className="p-4">Transaction ID</th>
+                <th className="p-4">Member</th>
+                <th className="p-4">Plan Tier</th>
+                <th className="p-4">Amount</th>
+                <th className="p-4">Status</th>
+                <th className="p-4">Date</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1F2937]/80">
+              {transactions.map((tx) => (
+                <tr key={tx.id} className="hover:bg-[#1F2937]/30 transition-colors">
+                  <td className="p-4 font-mono text-rose-400">{tx.id}</td>
+                  <td className="p-4 text-white font-semibold">{tx.user}</td>
+                  <td className="p-4 text-slate-300">{tx.plan}</td>
+                  <td className="p-4 text-white font-bold">{tx.amount}</td>
+                  <td className="p-4">
+                    <span className="bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
+                      {tx.status}
+                    </span>
+                  </td>
+                  <td className="p-4 text-slate-400 font-mono text-[11px]">{tx.date}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

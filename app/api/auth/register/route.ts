@@ -4,10 +4,20 @@ import connectToDatabase from '@/lib/mongodb';
 import User from '@/models/User';
 import Profile from '@/models/Profile';
 import { registerSchema } from '@/lib/validations';
+import { authRateLimiter, getClientIp, createRateLimitResponse } from '@/lib/rateLimit';
+import { sanitizeMongoInput, sanitizeHtmlText, normalizeEmail } from '@/lib/security';
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    // 1. Rate Limiting (Account creation throttling)
+    const clientIp = getClientIp(req);
+    const rateCheck = authRateLimiter.check(clientIp);
+    if (!rateCheck.success) {
+      return createRateLimitResponse(rateCheck.resetMs, 'Too many registration attempts. Please try again later.');
+    }
+
+    const rawBody = await req.json();
+    const body = sanitizeMongoInput(rawBody);
     const validated = registerSchema.safeParse(body);
 
     if (!validated.success) {
@@ -18,7 +28,8 @@ export async function POST(req: Request) {
     }
 
     const { firstName, name, email, password, dateOfBirth, gender } = validated.data;
-    const displayName = (name || firstName).trim();
+    const cleanEmail = normalizeEmail(email);
+    const displayName = sanitizeHtmlText((name || firstName).trim());
 
     const conn = await connectToDatabase();
 

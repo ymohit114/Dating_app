@@ -4,7 +4,11 @@ import { extractAuthUser } from '@/lib/auth';
 import connectToDatabase from '@/lib/mongodb';
 import Message from '@/models/Message';
 import Match from '@/models/Match';
+import Block from '@/models/Block';
 import socketManager from '@/lib/socket';
+import { messageRateLimiter, createRateLimitResponse } from '@/lib/rateLimit';
+import { sanitizeMongoInput, sanitizeHtmlText } from '@/lib/security';
+import { analyzeMessageSafety } from '@/lib/chatSafety';
 
 export async function GET(req: Request) {
   try {
@@ -55,7 +59,16 @@ export async function POST(req: Request) {
     }
 
     const senderId = authUser.userId;
-    const { matchId, receiverId, text, mediaUrl, type = 'text' } = await req.json();
+
+    // 1. Rate Limiting (30 messages per minute per user)
+    const rateCheck = messageRateLimiter.check(`user_${senderId}`);
+    if (!rateCheck.success) {
+      return createRateLimitResponse(rateCheck.resetMs, 'You are sending messages too quickly. Please wait a moment.');
+    }
+
+    const rawBody = await req.json();
+    const body = sanitizeMongoInput(rawBody);
+    const { matchId, receiverId, text, mediaUrl, type = 'text' } = body;
 
     if (!matchId || !text || !text.trim()) {
       return NextResponse.json({ error: 'matchId and text are required' }, { status: 400 });
@@ -72,12 +85,33 @@ export async function POST(req: Request) {
         actualReceiverId = u1 === senderId.toString() ? u2 : u1;
       }
 
+      // 2. Block Verification: Ensure neither user has blocked the other
+      if (actualReceiverId) {
+        const isBlocked = await Block.findOne({
+          $or: [
+            { blockerId: senderId, blockedId: actualReceiverId },
+            { blockerId: actualReceiverId, blockedId: senderId },
+          ],
+        });
+
+        if (isBlocked) {
+          return NextResponse.json(
+            { error: 'You cannot send messages to this user because of privacy and safety settings.' },
+            { status: 403 }
+          );
+        }
+      }
+
+      // 3. XSS & Chat Safety Analysis (Mask phone/UPI, strip HTML injection)
+      const cleanInput = sanitizeHtmlText(text);
+      const safetyResult = analyzeMessageSafety(cleanInput);
+
       const newMessage = await Message.create({
         matchId,
         senderId,
         receiverId: actualReceiverId,
-        text: text.trim(),
-        originalText: text.trim(),
+        text: safetyResult.maskedText,
+        originalText: cleanInput,
         mediaUrl,
         type,
         read: false,

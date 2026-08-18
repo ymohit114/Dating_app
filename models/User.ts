@@ -6,6 +6,7 @@ export interface IUserDocument extends Document {
   passwordHash: string;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
+  isManaged?: boolean;
   role: 'user' | 'moderator' | 'admin' | 'superadmin';
   status: 'active' | 'suspended' | 'banned' | 'deleted';
   createdAt: Date;
@@ -19,6 +20,7 @@ const UserSchema = new Schema<IUserDocument>(
     passwordHash: { type: String, required: true },
     isEmailVerified: { type: Boolean, default: false },
     isPhoneVerified: { type: Boolean, default: false },
+    isManaged: { type: Boolean, default: false },
     role: {
       type: String,
       enum: ['user', 'moderator', 'admin', 'superadmin'],

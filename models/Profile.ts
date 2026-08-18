@@ -26,6 +26,7 @@ export interface IProfileDocument extends Document {
     country?: string;
   };
   isProfileComplete: boolean;
+  isManaged?: boolean;
   verificationStatus: 'unverified' | 'pending' | 'verified' | 'rejected';
   createdAt: Date;
   updatedAt: Date;
@@ -73,14 +74,15 @@ const ProfileSchema = new Schema<IProfileDocument>(
         default: 'Point',
       },
       coordinates: {
-        type: [Number], // [lng, lat]
-        default: [77.2090, 28.6139],
+        type: [Number],
+        default: [77.2090, 28.6139], // Default Delhi coordinates
       },
       city: { type: String, default: 'New Delhi' },
       state: { type: String, default: 'Delhi' },
       country: { type: String, default: 'India' },
     },
     isProfileComplete: { type: Boolean, default: false },
+    isManaged: { type: Boolean, default: false },
     verificationStatus: {
       type: String,
       enum: ['unverified', 'pending', 'verified', 'rejected'],
@@ -91,7 +93,6 @@ const ProfileSchema = new Schema<IProfileDocument>(
 );
 
 ProfileSchema.index({ location: '2dsphere' });
-ProfileSchema.index({ interestedIn: 1, gender: 1 });
 
 export const Profile: Model<IProfileDocument> =
   mongoose.models.Profile || mongoose.model<IProfileDocument>('Profile', ProfileSchema);

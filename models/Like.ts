@@ -3,6 +3,8 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export interface ILikeDocument extends Document {
   fromUser: mongoose.Types.ObjectId;
   toUser: mongoose.Types.ObjectId;
+  scheduledMatchAt?: Date;
+  isProcessed?: boolean;
   createdAt: Date;
 }
 
@@ -10,6 +12,8 @@ const LikeSchema = new Schema<ILikeDocument>(
   {
     fromUser: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     toUser: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    scheduledMatchAt: { type: Date, index: true },
+    isProcessed: { type: Boolean, default: false },
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );

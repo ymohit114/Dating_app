@@ -3,6 +3,7 @@ import { extractAuthUser } from '@/lib/auth';
 import connectToDatabase from '@/lib/mongodb';
 import Profile from '@/models/Profile';
 import { profileSchema } from '@/lib/validations';
+import { sanitizeMongoInput, sanitizeHtmlText } from '@/lib/security';
 
 export async function GET(req: Request) {
   try {
@@ -30,7 +31,19 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: 'Unauthorized. Please log in.' }, { status: 401 });
     }
 
-    const body = await req.json();
+    const rawBody = await req.json();
+    const body = sanitizeMongoInput(rawBody);
+
+    // Sanitize string fields against XSS
+    if (body.bio) body.bio = sanitizeHtmlText(body.bio);
+    if (body.name) body.name = sanitizeHtmlText(body.name);
+    if (body.firstName) body.firstName = sanitizeHtmlText(body.firstName);
+    if (body.job) body.job = sanitizeHtmlText(body.job);
+    if (body.occupation) body.occupation = sanitizeHtmlText(body.occupation);
+    if (body.school) body.school = sanitizeHtmlText(body.school);
+    if (body.education) body.education = sanitizeHtmlText(body.education);
+    if (body.company) body.company = sanitizeHtmlText(body.company);
+
     const validated = profileSchema.safeParse(body);
     if (!validated.success) {
       return NextResponse.json(

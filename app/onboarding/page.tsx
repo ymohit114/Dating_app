@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/Button';
 import { 
   Sparkles, MapPin, Briefcase, GraduationCap, 
   ArrowRight, ArrowLeft, Check, Camera, ImagePlus, 
-  Trash2, User, AlertCircle 
+  Trash2, User, AlertCircle, Upload 
 } from 'lucide-react';
+import { compressImageFile } from '@/utils/imageCompressor';
+import { api } from '@/lib/api-client';
 
 const RELATIONSHIP_GOALS = [
   'Long-term',
@@ -30,6 +32,7 @@ export default function OnboardingPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   // Step 1: Mandatory Name & Photo
@@ -44,22 +47,38 @@ export default function OnboardingPage() {
   const [relationshipGoal, setRelationshipGoal] = useState<string>('Long-term');
   const [interests, setInterests] = useState<string[]>(profile?.passions || ['Specialty Coffee', 'Travel', 'Architecture']);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64Url = event.target?.result as string;
-        if (base64Url) {
-          setPhotos((prev) => (prev.length < 6 ? [...prev, base64Url] : prev));
-          setErrorMessage('');
+    setIsUploading(true);
+    const availableSlots = 6 - photos.length;
+    const filesToUpload = Array.from(files).slice(0, availableSlots);
+
+    const uploadedUrls: string[] = [];
+
+    for (const file of filesToUpload) {
+      if (!file.type.startsWith('image/')) continue;
+      try {
+        const compressedBase64 = await compressImageFile(file, 1080, 1440, 0.85);
+        const res = await api.post('/api/upload', { image: compressedBase64 });
+        if (res && res.url) {
+          uploadedUrls.push(res.url);
+        } else {
+          uploadedUrls.push(compressedBase64);
         }
-      };
-      reader.readAsDataURL(file);
-    });
+      } catch (err) {
+        console.error('Upload failed:', err);
+      }
+    }
+
+    if (uploadedUrls.length > 0) {
+      setPhotos((prev) => [...prev, ...uploadedUrls]);
+      setErrorMessage('');
+    }
+
+    setIsUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const removePhoto = (index: number) => {
@@ -88,6 +107,7 @@ export default function OnboardingPage() {
     setIsLoading(true);
     await updateProfile({
       name: name.trim(),
+      firstName: name.trim(),
       photos,
       location: {
         type: 'Point',
@@ -105,89 +125,87 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-4 bg-zinc-950 text-white">
-      <div className="w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-10 shadow-2xl space-y-6">
-        {/* Step Indicator */}
-        <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-400">Profile Setup</span>
-            <h1 className="text-xl sm:text-2xl font-black text-white mt-0.5">
-              {step === 1 && '1. Name & Mandatory Photo'}
-              {step === 2 && '2. Location, Career & Bio'}
-              {step === 3 && '3. Intentions & Passions'}
-            </h1>
+    <div className="min-h-screen bg-zinc-950 flex flex-col justify-center items-center p-4">
+      {/* Container */}
+      <div className="w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+        
+        {/* Progress Bar */}
+        <div className="space-y-2">
+          <div className="flex justify-between items-center text-xs font-semibold text-zinc-400">
+            <span>Step {step} of 3</span>
+            <span>{step === 1 ? 'Identity & Photos' : step === 2 ? 'Bio & Intentions' : 'Interests & Passions'}</span>
           </div>
-          <div className="flex gap-1.5">
-            {[1, 2, 3].map((s) => (
-              <div
-                key={s}
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  s === step ? 'w-7 bg-rose-500' : s < step ? 'w-3 bg-rose-700' : 'w-3 bg-zinc-800'
-                }`}
-              />
-            ))}
+          <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-rose-600 to-pink-600 transition-all duration-300"
+              style={{ width: `${(step / 3) * 100}%` }}
+            />
           </div>
         </div>
 
         {errorMessage && (
-          <div className="p-3.5 rounded-2xl bg-rose-950/80 border border-rose-800 text-rose-300 text-xs font-bold flex items-center gap-2">
+          <div className="p-3 bg-red-950/80 border border-red-800 rounded-xl text-red-300 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
 
-        {/* Step 1: Mandatory Name & Photo Upload */}
+        {/* STEP 1: Mandatory Full Name & Photo Upload */}
         {step === 1 && (
-          <div className="space-y-5 pt-2">
+          <div className="space-y-6">
             <div>
-              <label className="text-xs text-zinc-300 font-bold flex items-center justify-between mb-1">
-                <span>Your Display Name <span className="text-rose-500">*</span></span>
-                <span className="text-[10px] text-rose-400 font-bold uppercase">Required</span>
-              </label>
-              <div className="relative">
-                <User className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter your name (e.g. Mohit, Sudhir, Rohit)"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white text-sm pl-10 pr-4 py-2.5 rounded-2xl focus:outline-none focus:border-rose-500"
-                />
-              </div>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <User className="w-5 h-5 text-rose-500" />
+                <span>Tell us your Name &amp; Photo</span>
+              </h2>
+              <p className="text-xs text-zinc-400 mt-1">
+                Your full name and at least 1 real gallery photo are strictly required to start matching.
+              </p>
             </div>
 
+            {/* Mandatory Name Input */}
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs text-zinc-300 font-bold">
-                  Profile Photos <span className="text-rose-500">*</span>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
+                Your Full Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter your real full name"
+                className="w-full bg-zinc-950 border border-zinc-800 text-white text-sm px-4 py-3 rounded-2xl focus:outline-none focus:border-rose-500"
+              />
+            </div>
+
+            {/* Photo Uploader */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                  <Camera className="w-4 h-4 text-rose-500" />
+                  <span>Upload Photos (At least 1 required) <span className="text-rose-500">*</span></span>
                 </label>
-                <span className="text-[11px] text-rose-400 font-bold">
-                  At least 1 photo MANDATORY ({photos.length}/6)
-                </span>
+                <span className="text-[11px] text-zinc-500 font-mono">{photos.length}/6 photos</span>
               </div>
 
               {/* Photos Grid */}
               <div className="grid grid-cols-3 gap-3">
-                {photos.map((url, index) => (
-                  <div
-                    key={index}
-                    className="relative aspect-square rounded-2xl overflow-hidden border-2 border-rose-500/50 bg-zinc-950 group"
-                  >
+                {photos.map((url, idx) => (
+                  <div key={idx} className="relative aspect-[3/4] rounded-2xl overflow-hidden border border-zinc-700 bg-zinc-950 group">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <img src={url} alt={`Upload ${idx + 1}`} className="w-full h-full object-cover" />
+                    {idx === 0 && (
+                      <span className="absolute top-2 left-2 bg-rose-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full shadow">
+                        Main
+                      </span>
+                    )}
                     <button
                       type="button"
-                      onClick={() => removePhoto(index)}
-                      className="absolute top-1.5 right-1.5 p-1.5 bg-black/70 hover:bg-red-600 text-white rounded-full transition-colors cursor-pointer"
+                      onClick={() => removePhoto(idx)}
+                      className="absolute top-2 right-2 p-1.5 rounded-xl bg-black/70 hover:bg-red-600 text-white transition-colors opacity-0 group-hover:opacity-100"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                    {index === 0 && (
-                      <span className="absolute bottom-1.5 left-1.5 bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded">
-                        MAIN
-                      </span>
-                    )}
                   </div>
                 ))}
 
@@ -195,180 +213,188 @@ export default function OnboardingPage() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="aspect-square rounded-2xl border-2 border-dashed border-zinc-700 hover:border-rose-500 bg-zinc-950 flex flex-col items-center justify-center text-zinc-400 hover:text-rose-400 transition-all cursor-pointer p-2 text-center"
+                    disabled={isUploading}
+                    className="aspect-[3/4] rounded-2xl border-2 border-dashed border-zinc-700 hover:border-rose-500 hover:bg-zinc-800/50 flex flex-col items-center justify-center gap-2 text-zinc-400 hover:text-white transition-all cursor-pointer disabled:opacity-50"
                   >
-                    <ImagePlus className="w-6 h-6 mb-1" />
-                    <span className="text-[11px] font-bold">Upload from Gallery</span>
+                    {isUploading ? (
+                      <>
+                        <span className="w-5 h-5 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+                        <span className="text-[11px] font-semibold text-rose-400">Uploading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-10 h-10 rounded-2xl bg-zinc-800 flex items-center justify-center text-rose-500">
+                          <ImagePlus className="w-5 h-5" />
+                        </div>
+                        <span className="text-[11px] font-semibold">Choose Gallery</span>
+                      </>
+                    )}
                   </button>
                 )}
               </div>
 
+              {/* Hidden native file input */}
               <input
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
                 multiple
-                onChange={handleFileUpload}
                 className="hidden"
+                onChange={handleFileUpload}
               />
-
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-2.5 px-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold flex items-center justify-center gap-2 border border-zinc-700 transition-colors cursor-pointer"
-                >
-                  <Camera className="w-4 h-4 text-rose-400" /> Choose Photos from Device / Gallery
-                </button>
-              </div>
             </div>
 
             <Button
+              type="button"
               variant="gradient"
-              size="lg"
-              className="w-full mt-4"
               onClick={handleStep1Next}
+              disabled={isUploading}
+              className="w-full py-3 text-sm font-bold shadow-lg shadow-rose-600/30"
             >
-              Continue to Step 2 <ArrowRight className="w-4 h-4 ml-1" />
+              <span>Continue to Next Step</span>
+              <ArrowRight className="w-4 h-4 ml-1.5" />
             </Button>
           </div>
         )}
 
-        {/* Step 2: City, Occupation, Bio */}
+        {/* STEP 2: Intentions, City & Bio */}
         {step === 2 && (
-          <div className="space-y-4 pt-2">
+          <div className="space-y-5">
             <div>
-              <label className="text-xs text-zinc-300 font-semibold">City</label>
-              <div className="relative mt-1">
-                <MapPin className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="e.g. New Delhi, Mumbai, Bengaluru"
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white text-sm pl-10 pr-4 py-2.5 rounded-2xl focus:outline-none focus:border-rose-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-zinc-300 font-semibold">Occupation / Work</label>
-                <div className="relative mt-1">
-                  <Briefcase className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={occupation}
-                    onChange={(e) => setOccupation(e.target.value)}
-                    placeholder="e.g. Software Engineer, Designer"
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white text-sm pl-10 pr-4 py-2.5 rounded-2xl focus:outline-none focus:border-rose-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs text-zinc-300 font-semibold">Education / College</label>
-                <div className="relative mt-1">
-                  <GraduationCap className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={education}
-                    onChange={(e) => setEducation(e.target.value)}
-                    placeholder="e.g. Delhi University, IIT"
-                    className="w-full bg-zinc-950 border border-zinc-800 text-white text-sm pl-10 pr-4 py-2.5 rounded-2xl focus:outline-none focus:border-rose-500"
-                  />
-                </div>
-              </div>
+              <h2 className="text-xl font-bold text-white">Your Intentions &amp; Bio</h2>
+              <p className="text-xs text-zinc-400 mt-1">
+                Help matches understand what you are looking for.
+              </p>
             </div>
 
             <div>
-              <label className="text-xs text-zinc-300 font-semibold">About You (Bio)</label>
-              <textarea
-                rows={3}
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                placeholder="Share your authentic passions, hobbies, and weekend rituals..."
-                className="w-full mt-1 bg-zinc-950 border border-zinc-800 text-white text-sm p-3 rounded-2xl focus:outline-none focus:border-rose-500"
+              <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Your City</label>
+              <input
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="e.g. New Delhi, Mumbai, Bengaluru"
+                className="w-full bg-zinc-950 border border-zinc-800 text-white text-sm px-4 py-2.5 rounded-2xl focus:outline-none focus:border-rose-500"
               />
             </div>
 
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" size="lg" className="flex-1" onClick={() => setStep(1)}>
-                <ArrowLeft className="w-4 h-4 mr-1" /> Back
-              </Button>
-              <Button
-                variant="gradient"
-                size="lg"
-                className="flex-1"
-                onClick={() => setStep(3)}
-              >
-                Next <ArrowRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Relationship Goals & Interests */}
-        {step === 3 && (
-          <div className="space-y-5 pt-2">
             <div>
-              <label className="text-xs font-bold text-zinc-300 block mb-2">Relationship Goals</label>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Relationship Intentions</label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {RELATIONSHIP_GOALS.map((goal) => (
                   <button
                     key={goal}
                     type="button"
                     onClick={() => setRelationshipGoal(goal)}
-                    className={`p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all ${
                       relationshipGoal === goal
-                        ? 'bg-rose-500/20 border-rose-500 text-rose-300 font-bold'
-                        : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
+                        ? 'bg-rose-600 text-white border-rose-500 shadow-md shadow-rose-600/20'
+                        : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:text-white'
                     }`}
                   >
-                    <span className="text-xs">{goal}</span>
+                    {goal}
                   </button>
                 ))}
               </div>
             </div>
 
             <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-xs font-bold text-zinc-300">Passions ({interests.length}/8)</label>
-                <span className="text-[11px] text-zinc-500">Pick up to 8</span>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1.5">About You (Bio)</label>
+              <textarea
+                rows={3}
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                placeholder="Share a little about who you are, what you enjoy, or what makes you laugh..."
+                className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs p-3 rounded-2xl focus:outline-none focus:border-rose-500 leading-relaxed"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">Profession</label>
+                <input
+                  type="text"
+                  value={occupation}
+                  onChange={(e) => setOccupation(e.target.value)}
+                  placeholder="e.g. Designer"
+                  className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-rose-500"
+                />
               </div>
-              <div className="flex flex-wrap gap-2">
-                {INTERESTS_LIST.map((item) => {
-                  const sel = interests.includes(item);
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      onClick={() => toggleInterest(item)}
-                      className={`text-xs px-3 py-1.5 rounded-full transition-all cursor-pointer ${
-                        sel
-                          ? 'bg-gradient-to-r from-rose-600 to-pink-600 text-white font-bold'
-                          : 'bg-zinc-950 text-zinc-400 border border-zinc-800 hover:border-zinc-700'
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  );
-                })}
+              <div>
+                <label className="block text-xs font-semibold text-zinc-300 mb-1">Education / College</label>
+                <input
+                  type="text"
+                  value={education}
+                  onChange={(e) => setEducation(e.target.value)}
+                  placeholder="e.g. Delhi University"
+                  className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-rose-500"
+                />
               </div>
             </div>
 
-            <div className="flex gap-3 pt-3">
-              <Button variant="outline" size="lg" className="flex-1" onClick={() => setStep(2)}>
-                <ArrowLeft className="w-4 h-4 mr-1" /> Back
+            <div className="flex gap-3 pt-2">
+              <Button type="button" variant="outline" onClick={() => setStep(1)} className="flex-1 text-xs">
+                <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Back
+              </Button>
+              <Button type="button" variant="gradient" onClick={() => setStep(3)} className="flex-1 text-xs font-bold">
+                Next: Passions <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3: Passions & Finish */}
+        {step === 3 && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-xl font-bold text-white">Select Your Passions</h2>
+              <p className="text-xs text-zinc-400 mt-1">
+                Pick things you love to do so we can find people with similar chemistry.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-2">
+              {INTERESTS_LIST.map((item) => {
+                const isSelected = interests.includes(item);
+                return (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => toggleInterest(item)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                      isSelected
+                        ? 'bg-rose-600 text-white border border-rose-500 shadow-md shadow-rose-600/20'
+                        : 'bg-zinc-950 text-zinc-400 border border-zinc-800 hover:text-white'
+                    }`}
+                  >
+                    {isSelected && <Check className="w-3 h-3 inline mr-1" />}
+                    {item}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button type="button" variant="outline" onClick={() => setStep(2)} className="flex-1 text-xs">
+                <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Back
               </Button>
               <Button
+                type="button"
                 variant="gradient"
-                size="lg"
-                className="flex-1"
+                disabled={isLoading}
                 onClick={handleFinish}
-                isLoading={isLoading}
+                className="flex-1 text-xs font-bold shadow-lg shadow-rose-600/30"
               >
-                Complete Profile ✨
+                {isLoading ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Creating Profile...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" /> Start Discovering
+                  </span>
+                )}
               </Button>
             </div>
           </div>

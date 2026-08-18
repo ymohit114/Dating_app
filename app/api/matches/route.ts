@@ -5,6 +5,9 @@ import connectToDatabase from '@/lib/mongodb';
 import Match from '@/models/Match';
 import Profile from '@/models/Profile';
 import User from '@/models/User';
+import { processScheduledMatches } from '@/services/matching.service';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
@@ -17,6 +20,9 @@ export async function GET(req: Request) {
     const conn = await connectToDatabase();
 
     if (conn) {
+      // Evaluate any elapsed scheduled matches from managed profiles
+      await processScheduledMatches();
+
       const userConditions: any[] = [
         { user1: currentUserId },
         { user2: currentUserId },
@@ -61,36 +67,39 @@ export async function GET(req: Request) {
             otherProfile: prof
               ? {
                   _id: prof._id.toString(),
-                  userId: prof.userId.toString(),
-                  name: prof.name || prof.firstName || 'Member',
-                  age: prof.age || 24,
-                  photos: prof.photos && prof.photos.length > 0
-                    ? prof.photos.map((p: any) => (typeof p === 'string' ? p : p.url))
-                    : ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800'],
-                  bio: prof.bio || '',
+                  userId: otherId,
+                  name: prof.name || prof.firstName || 'Match',
+                  age: prof.dateOfBirth
+                    ? Math.abs(new Date(Date.now() - new Date(prof.dateOfBirth).getTime()).getUTCFullYear() - 1970)
+                    : 24,
+                  gender: prof.gender || 'woman',
+                  photos: prof.photos && prof.photos.length > 0 ? prof.photos : ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600'],
+                  bio: prof.bio || 'Living life with intention and good vibes ✨',
+                  job: prof.job || prof.occupation || 'Creative Professional',
                   location: {
-                    type: 'Point' as const,
-                    coordinates: prof.location?.coordinates || [77.209, 28.6139],
                     city: prof.city || prof.location?.city || 'New Delhi',
                   },
-                  isVerified: prof.verificationStatus === 'verified' || prof.isVerified || false,
-                  onlineStatus: 'online' as const,
+                  onlineStatus: 'online',
+                  isVerified: prof.verificationStatus === 'verified' || prof.isVerified === true,
                 }
               : {
                   _id: `prof_${otherId}`,
                   userId: otherId,
-                  name: 'Member',
+                  name: 'Match',
                   age: 24,
-                  photos: ['https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800'],
-                  location: { type: 'Point' as const, coordinates: [77.209, 28.6139], city: 'New Delhi' },
+                  photos: ['https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600'],
+                  bio: 'Hey there! Nice to meet you.',
+                  location: { city: 'New Delhi' },
+                  onlineStatus: 'online',
                   isVerified: true,
-                  onlineStatus: 'online' as const,
                 },
           };
         });
 
         return NextResponse.json({ success: true, matches: formatted });
       }
+
+      return NextResponse.json({ success: true, matches: [] });
     }
 
     return NextResponse.json({ success: true, matches: [] });

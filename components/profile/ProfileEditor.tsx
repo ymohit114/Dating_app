@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { IProfile, IProfilePrompt } from '@/types';
+import { IProfile } from '@/types';
 import { Button } from '@/components/ui/Button';
-import { Plus, Trash2, Camera, Sparkles, Check, ArrowUp, ArrowDown, Upload, Image as ImageIcon, Link as LinkIcon } from 'lucide-react';
+import { Camera, Check, ArrowUp, ArrowDown, Upload, Trash2, Link as LinkIcon, Plus } from 'lucide-react';
+import { compressImageFile } from '@/utils/imageCompressor';
+import { api } from '@/lib/api-client';
 
 interface ProfileEditorProps {
   initialProfile: IProfile;
@@ -11,88 +13,56 @@ interface ProfileEditorProps {
   onCancel: () => void;
 }
 
-const ALL_PASSIONS = [
-  'Photography', 'Specialty Coffee', 'Hiking', 'Indie Rock', 'Tech', 'Culinary Arts',
-  'Modern Art', 'Film Photography', 'Yoga', 'Matcha', 'Vintage Fashion', 'Travel',
-  'Surfing', 'Running', 'Fine Dining', 'Podcasts', 'Dogs', 'Piano', 'Architecture',
-  'Electronic Music', 'Ramen', 'Bouldering', 'Astrophotography', 'Wildlife', 'Baking',
-  'Wine Tasting', 'Literature', 'Tennis', 'Anime', 'Gaming', 'Gym & Fitness'
-];
-
-const PROMPT_SUGGESTIONS = [
-  'Two truths and a lie...',
-  'The key to my heart is...',
-  'My simple pleasures in life...',
-  'We’ll get along if...',
-  'Dating me is like...',
-  'Best travel story...',
-  'I guarantee you that...',
-  'Together we could...',
-  'First round is on me if...',
-];
-
 export function ProfileEditor({ initialProfile, onSave, onCancel }: ProfileEditorProps) {
   const [name, setName] = useState(initialProfile.name || '');
   const [bio, setBio] = useState(initialProfile.bio || '');
-  const [job, setJob] = useState(initialProfile.job || '');
-  const [company, setCompany] = useState(initialProfile.company || '');
-  const [school, setSchool] = useState(initialProfile.school || '');
-  const [height, setHeight] = useState(initialProfile.height || 175);
   const [city, setCity] = useState(initialProfile.location?.city || '');
+  const [job, setJob] = useState(initialProfile.job || '');
   const [photos, setPhotos] = useState<string[]>(initialProfile.photos || []);
-  const [passions, setPassions] = useState<string[]>(initialProfile.passions || []);
-  const [prompts, setPrompts] = useState<IProfilePrompt[]>(initialProfile.prompts || []);
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const togglePassion = (passion: string) => {
-    if (passions.includes(passion)) {
-      setPassions(passions.filter((p) => p !== passion));
-    } else if (passions.length < 6) {
-      setPassions([...passions, passion]);
-    }
-  };
 
   const handleGalleryClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
+    setUploadStatus('Uploading to Cloudinary...');
     const availableSlots = 6 - photos.length;
-    const filesToRead = Array.from(files).slice(0, availableSlots);
+    const filesToUpload = Array.from(files).slice(0, availableSlots);
 
-    let processedCount = 0;
-    const newBase64Photos: string[] = [];
+    const uploadedUrls: string[] = [];
 
-    filesToRead.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          newBase64Photos.push(event.target.result as string);
+    for (const file of filesToUpload) {
+      try {
+        const compressedBase64 = await compressImageFile(file, 1080, 1440, 0.85);
+        const res = await api.post('/api/upload', { image: compressedBase64 });
+        if (res && res.url) {
+          uploadedUrls.push(res.url);
+        } else {
+          uploadedUrls.push(compressedBase64);
         }
-        processedCount++;
-        if (processedCount === filesToRead.length) {
-          setPhotos((prev) => [...prev, ...newBase64Photos]);
-          setIsUploading(false);
-          if (fileInputRef.current) fileInputRef.current.value = '';
-        }
-      };
-      reader.onerror = () => {
-        processedCount++;
-        if (processedCount === filesToRead.length) {
-          setIsUploading(false);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+      } catch (err) {
+        console.error('Error uploading photo:', err);
+      }
+    }
+
+    if (uploadedUrls.length > 0) {
+      setPhotos((prev) => [...prev, ...uploadedUrls]);
+    }
+
+    setIsUploading(false);
+    setUploadStatus(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleAddPhotoUrl = () => {
@@ -117,54 +87,33 @@ export function ProfileEditor({ initialProfile, onSave, onCancel }: ProfileEdito
     setPhotos(newPhotos);
   };
 
-  const handleAddPrompt = () => {
-    if (prompts.length < 3) {
-      setPrompts([
-        ...prompts,
-        {
-          id: `p_${Date.now()}`,
-          question: PROMPT_SUGGESTIONS[prompts.length % PROMPT_SUGGESTIONS.length],
-          answer: '',
-        },
-      ]);
-    }
-  };
-
-  const handleUpdatePrompt = (id: string, field: 'question' | 'answer', val: string) => {
-    setPrompts(prompts.map((p) => (p.id === id ? { ...p, [field]: val } : p)));
-  };
-
-  const handleRemovePrompt = (id: string) => {
-    setPrompts(prompts.filter((p) => p.id !== id));
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (photos.length === 0) {
+      alert('Please upload at least 1 profile photo.');
+      return;
+    }
+
     onSave({
-      name,
-      firstName: name,
-      bio,
-      job,
-      company,
-      school,
-      height: Number(height),
+      name: name.trim(),
+      firstName: name.trim(),
+      bio: bio.trim(),
+      job: job.trim(),
       location: {
         ...initialProfile.location,
-        city,
+        city: city.trim(),
       },
       photos,
-      passions,
-      prompts,
     });
     setIsSaved(true);
     setTimeout(() => {
       setIsSaved(false);
       onCancel();
-    }, 800);
+    }, 500);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 max-w-2xl mx-auto pb-12">
+    <form onSubmit={handleSubmit} className="space-y-6 max-w-xl mx-auto pb-12">
       {/* Hidden File Input for Device Gallery */}
       <input
         ref={fileInputRef}
@@ -198,308 +147,220 @@ export function ProfileEditor({ initialProfile, onSave, onCancel }: ProfileEdito
               {isUploading ? (
                 <>
                   <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Loading...</span>
+                  <span>{uploadStatus || 'Uploading...'}</span>
                 </>
               ) : (
                 <>
                   <Upload className="w-3.5 h-3.5" />
-                  <span>Choose from Gallery</span>
+                  <span>Upload From Gallery</span>
                 </>
               )}
             </button>
           )}
         </div>
 
-        {/* Photos Grid */}
+        {/* 6 Photo Slots Grid */}
         <div className="grid grid-cols-3 gap-3 pt-2">
-          {photos.map((url, idx) => (
-            <div
-              key={idx}
-              className="relative aspect-[3/4] rounded-2xl overflow-hidden border border-zinc-700/80 group shadow-md"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="w-full h-full object-cover" />
-              {idx === 0 && (
-                <span className="absolute top-2 left-2 bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
-                  Main Cover
-                </span>
-              )}
-              <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-1">
-                {idx > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => handleMovePhoto(idx, 'up')}
-                    className="p-1.5 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 cursor-pointer"
-                    title="Move Forward"
-                  >
-                    <ArrowUp className="w-4 h-4" />
-                  </button>
-                )}
-                {idx < photos.length - 1 && (
-                  <button
-                    type="button"
-                    onClick={() => handleMovePhoto(idx, 'down')}
-                    className="p-1.5 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 cursor-pointer"
-                    title="Move Backward"
-                  >
-                    <ArrowDown className="w-4 h-4" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleRemovePhoto(idx)}
-                  className="p-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 cursor-pointer"
-                  title="Remove Photo"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
+          {Array.from({ length: 6 }).map((_, idx) => {
+            const photoUrl = photos[idx];
+            return (
+              <div
+                key={idx}
+                className={`relative aspect-[3/4] rounded-2xl overflow-hidden border transition-all ${
+                  photoUrl
+                    ? 'border-zinc-700 bg-zinc-950 group'
+                    : 'border-dashed border-zinc-800 bg-zinc-950/40 hover:border-zinc-700 flex flex-col items-center justify-center cursor-pointer'
+                }`}
+                onClick={() => {
+                  if (!photoUrl && !isUploading) handleGalleryClick();
+                }}
+              >
+                {photoUrl ? (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={photoUrl}
+                      alt={`Photo ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
 
-          {/* Empty Upload Slots */}
-          {Array.from({ length: 6 - photos.length }).map((_, slotIdx) => (
+                    {/* Primary Badge for Slot 1 */}
+                    {idx === 0 && (
+                      <span className="absolute top-2 left-2 bg-gradient-to-r from-rose-600 to-pink-600 text-white text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full shadow-md">
+                        Main
+                      </span>
+                    )}
+
+                    {/* Overlay Action Controls */}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+                      <div className="flex justify-end gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemovePhoto(idx);
+                          }}
+                          className="p-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors shadow-xs cursor-pointer"
+                          title="Delete photo"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Reorder Buttons */}
+                      <div className="flex justify-between items-center bg-zinc-900/90 rounded-lg p-1">
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMovePhoto(idx, 'up');
+                          }}
+                          className="p-1 rounded text-zinc-300 hover:text-white disabled:opacity-30 cursor-pointer"
+                          title="Move left/up"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="text-[10px] text-zinc-400 font-mono">#{idx + 1}</span>
+                        <button
+                          type="button"
+                          disabled={idx === photos.length - 1}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMovePhoto(idx, 'down');
+                          }}
+                          className="p-1 rounded text-zinc-300 hover:text-white disabled:opacity-30 cursor-pointer"
+                          title="Move right/down"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center p-3">
+                    <div className="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 flex items-center justify-center mx-auto mb-1">
+                      <Plus className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] text-zinc-500 font-medium">Add #{idx + 1}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Alternative URL Link input toggle */}
+        <div className="pt-1">
+          {!showUrlInput ? (
             <button
-              key={`empty_${slotIdx}`}
               type="button"
-              onClick={handleGalleryClick}
-              className="aspect-[3/4] rounded-2xl border-2 border-dashed border-zinc-700/80 hover:border-rose-500/80 flex flex-col items-center justify-center p-3 text-center bg-zinc-950/40 hover:bg-rose-950/10 transition-colors cursor-pointer group"
+              onClick={() => setShowUrlInput(true)}
+              className="text-xs text-zinc-400 hover:text-rose-400 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-full bg-zinc-800 group-hover:bg-rose-600/30 flex items-center justify-center text-zinc-400 group-hover:text-rose-400 mb-1.5 transition-colors">
-                <Plus className="w-4 h-4" />
-              </div>
-              <span className="text-[11px] font-semibold text-zinc-400 group-hover:text-rose-300">
-                + Upload Photo
-              </span>
+              <LinkIcon className="w-3.5 h-3.5" />
+              <span>Or add image link URL</span>
             </button>
-          ))}
+          ) : (
+            <div className="flex gap-2 items-center">
+              <input
+                type="url"
+                value={newPhotoUrl}
+                onChange={(e) => setNewPhotoUrl(e.target.value)}
+                placeholder="https://..."
+                className="flex-1 bg-zinc-950 border border-zinc-800 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-rose-500"
+              />
+              <button
+                type="button"
+                onClick={handleAddPhotoUrl}
+                className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowUrlInput(false)}
+                className="px-2 py-2 text-zinc-500 hover:text-zinc-300 text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
-
-        {/* Optional URL Toggle */}
-        <div className="pt-2 border-t border-zinc-800 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => setShowUrlInput(!showUrlInput)}
-            className="text-[11px] text-zinc-400 hover:text-rose-400 flex items-center gap-1 transition-colors cursor-pointer"
-          >
-            <LinkIcon className="w-3 h-3" />
-            <span>{showUrlInput ? 'Hide URL input' : 'Or add via image web URL'}</span>
-          </button>
-        </div>
-
-        {showUrlInput && photos.length < 6 && (
-          <div className="flex gap-2">
-            <input
-              type="url"
-              placeholder="Paste image web URL (e.g. Unsplash or direct link)..."
-              value={newPhotoUrl}
-              onChange={(e) => setNewPhotoUrl(e.target.value)}
-              className="flex-1 bg-zinc-950 border border-zinc-700 text-white text-xs px-3 py-2.5 rounded-xl focus:outline-none focus:border-rose-500"
-            />
-            <Button type="button" size="sm" variant="secondary" onClick={handleAddPhotoUrl}>
-              Add URL
-            </Button>
-          </div>
-        )}
       </div>
 
-      {/* Basic Info & Bio */}
+      {/* Basic Identity Details */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-xl space-y-4">
-        <h3 className="text-base font-bold text-white mb-2">About You</h3>
+        <h3 className="text-base font-bold text-white mb-2">Basic Information</h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1">
-              Display Name
-            </label>
+            <label className="block text-xs font-semibold text-zinc-300 mb-1">Full Name</label>
             <input
               type="text"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Your full name"
-              className="w-full bg-zinc-950 border border-zinc-700 text-white text-sm px-3.5 py-2.5 rounded-xl focus:outline-none focus:border-rose-500 transition-colors"
+              placeholder="Your Name"
+              className="w-full bg-zinc-950 border border-zinc-800 text-white text-sm px-4 py-2.5 rounded-2xl focus:outline-none focus:border-rose-500"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1">
-              City / Location
-            </label>
+            <label className="block text-xs font-semibold text-zinc-300 mb-1">City / Location</label>
             <input
               type="text"
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              placeholder="New Delhi, Mumbai, Bengaluru..."
-              className="w-full bg-zinc-950 border border-zinc-700 text-white text-sm px-3.5 py-2.5 rounded-xl focus:outline-none focus:border-rose-500 transition-colors"
+              placeholder="e.g. New Delhi"
+              className="w-full bg-zinc-950 border border-zinc-800 text-white text-sm px-4 py-2.5 rounded-2xl focus:outline-none focus:border-rose-500"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-zinc-300 mb-1">
-            Bio ({bio.length}/500)
-          </label>
+          <label className="block text-xs font-semibold text-zinc-300 mb-1">About Me (Bio)</label>
           <textarea
             rows={3}
-            maxLength={500}
             value={bio}
             onChange={(e) => setBio(e.target.value)}
-            placeholder="Share a glimpse of your personality, humor, passions, or quirky interests..."
-            className="w-full bg-zinc-950 border border-zinc-700 text-white text-sm p-3.5 rounded-xl focus:outline-none focus:border-rose-500 transition-colors resize-none"
+            placeholder="Write a brief introduction about yourself..."
+            className="w-full bg-zinc-950 border border-zinc-800 text-white text-sm p-4 rounded-2xl focus:outline-none focus:border-rose-500 leading-relaxed"
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1">
-              Job Title
-            </label>
-            <input
-              type="text"
-              value={job}
-              onChange={(e) => setJob(e.target.value)}
-              placeholder="e.g. Product Designer"
-              className="w-full bg-zinc-950 border border-zinc-700 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-rose-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1">
-              Company
-            </label>
-            <input
-              type="text"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              placeholder="e.g. Studio 9"
-              className="w-full bg-zinc-950 border border-zinc-700 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-rose-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-zinc-300 mb-1">
-              Height (cm)
-            </label>
-            <input
-              type="number"
-              value={height}
-              onChange={(e) => setHeight(Number(e.target.value))}
-              placeholder="175"
-              className="w-full bg-zinc-950 border border-zinc-700 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-rose-500"
-            />
-          </div>
+        <div>
+          <label className="block text-xs font-semibold text-zinc-300 mb-1">Profession / Work</label>
+          <input
+            type="text"
+            value={job}
+            onChange={(e) => setJob(e.target.value)}
+            placeholder="e.g. Software Engineer / Designer"
+            className="w-full bg-zinc-950 border border-zinc-800 text-white text-sm px-4 py-2.5 rounded-2xl focus:outline-none focus:border-rose-500"
+          />
         </div>
       </div>
 
-      {/* Passions */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-xl space-y-3">
-        <h3 className="text-base font-bold text-white">
-          Passions &amp; Interests ({passions.length}/6)
-        </h3>
-        <p className="text-xs text-zinc-400">
-          Select up to 6 passions that describe your lifestyle.
-        </p>
-
-        <div className="flex flex-wrap gap-2 pt-2">
-          {ALL_PASSIONS.map((p) => {
-            const isSelected = passions.includes(p);
-            return (
-              <button
-                key={p}
-                type="button"
-                onClick={() => togglePassion(p)}
-                className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20'
-                    : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                }`}
-              >
-                {p}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Prompts */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-xl space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-bold text-white">
-              Icebreaker Prompts ({prompts.length}/3)
-            </h3>
-            <p className="text-xs text-zinc-400">
-              Answer prompts to spark real conversations.
-            </p>
-          </div>
-          {prompts.length < 3 && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={handleAddPrompt}
-              className="border-zinc-700 text-zinc-300 hover:text-white"
-            >
-              <Plus className="w-3.5 h-3.5" /> Add Prompt
-            </Button>
-          )}
-        </div>
-
-        <div className="space-y-3">
-          {prompts.map((p) => (
-            <div
-              key={p.id}
-              className="bg-zinc-950 border border-zinc-800 p-4 rounded-2xl space-y-2 relative group"
-            >
-              <button
-                type="button"
-                onClick={() => handleRemovePrompt(p.id)}
-                className="absolute top-3 right-3 text-zinc-500 hover:text-red-400 p-1 cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-              <select
-                value={p.question}
-                onChange={(e) => handleUpdatePrompt(p.id, 'question', e.target.value)}
-                className="bg-transparent text-xs font-bold text-rose-400 border-none outline-none cursor-pointer w-full pr-8"
-              >
-                {PROMPT_SUGGESTIONS.map((q) => (
-                  <option key={q} value={q} className="bg-zinc-900 text-white">
-                    {q}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                value={p.answer}
-                onChange={(e) => handleUpdatePrompt(p.id, 'answer', e.target.value)}
-                placeholder="Write your witty answer..."
-                className="w-full bg-zinc-900/50 border border-zinc-800 text-white text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-rose-500"
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Floating Save Toolbar */}
-      <div className="sticky bottom-6 z-20 flex items-center justify-end gap-3 bg-zinc-900/90 backdrop-blur-md border border-zinc-800 p-3 rounded-2xl shadow-2xl">
+      {/* Sticky Bottom Action Buttons */}
+      <div className="sticky bottom-6 z-20 flex gap-3 p-4 bg-zinc-950/90 backdrop-blur-md rounded-2xl border border-zinc-800 shadow-2xl">
         <Button
           type="button"
           variant="outline"
           onClick={onCancel}
-          className="border-zinc-700 text-zinc-300 hover:text-white"
+          className="flex-1 text-xs"
         >
           Cancel
         </Button>
+
         <Button
           type="submit"
-          variant="primary"
-          className="bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white shadow-lg shadow-rose-600/30 px-6"
+          variant="gradient"
+          disabled={isUploading}
+          className="flex-1 text-xs font-bold shadow-lg shadow-rose-600/30"
         >
           {isSaved ? (
-            <span className="flex items-center gap-1.5">
-              <Check className="w-4 h-4" /> Profile Saved!
+            <span className="flex items-center gap-1">
+              <Check className="w-4 h-4" /> Profile Updated!
             </span>
           ) : (
             'Save Changes'
